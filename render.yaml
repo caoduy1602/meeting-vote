@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: meeting-vote
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+    disk:
+      mountPath: /opt/render/project/src/data
