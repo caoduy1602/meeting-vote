@@ -242,6 +242,7 @@ function renderAdmin() {
   const doc = latestState.currentDoc;
   const tally = latestState.tally || { yes: 0, no: 0, blank: 0, total: 0 };
   const yesPct = getYesPercent(tally);
+  const approvalText = tally.total > 0 ? `${yesPct}%` : '0%';
   const history = latestState.history || [];
   const templates = latestState.templates || [];
 
@@ -279,7 +280,7 @@ function renderAdmin() {
           ${templates.length ? `<div class="template-list">${templates.map(t => `<div class="template-item"><div class="template-item-main"><div class="template-title">${escapeHtml(t.title)}</div><div class="template-content">${escapeHtml(t.content)}</div></div><div class="template-actions"><button class="btn btn-ghost btn-small use-template" data-title="${escapeHtml(t.title)}" data-content="${escapeHtml(t.content)}">Dùng</button><button class="btn btn-danger btn-small delete-template" data-template-id="${t.id}">Xóa</button></div></div>`).join('')}</div>` : '<div class="empty">Chưa có tài liệu nào được lưu.</div>'}
         </div>
         ${history.length ? `<div class="history"><h3>Lịch sử công văn</h3>${
-          history.map(d => `<div class="hist-row"><span class="hist-title">${escapeHtml(d.title)}</span><span class="hist-score">${d.status === 'closed' ? `Đồng ý ${d.yes} · Không ${d.no}${d.blank !== undefined ? ` · Trắng ${d.blank}` : ''}` : 'Đang mở'}</span><button class="btn btn-danger btn-small delete-history-item" data-doc-id="${d.id}">Xóa</button></div>`).join('')
+          history.map(d => `<div class="hist-row"><span class="hist-title">${escapeHtml(d.title)}</span><span class="hist-score">${d.status === 'closed' ? `Đồng ý ${d.yes} · Không ${d.no}${d.blank !== undefined ? ` · Không bỏ phiếu ${d.blank}` : ''}` : 'Đang mở'}</span><button class="btn btn-danger btn-small delete-history-item" data-doc-id="${d.id}">Xóa</button></div>`).join('')
         }</div>` : ''}
       </div>
       <div class="card panel tally-wrap">
@@ -289,11 +290,11 @@ function renderAdmin() {
         <div class="tally-nums">
           <div class="tnum yes"><div class="n">${tally.yes}</div><div class="lab">Đồng ý</div></div>
           <div class="tnum no"><div class="n">${tally.no}</div><div class="lab">Không đồng ý</div></div>
-          <div class="tnum blank"><div class="n">${tally.blank || 0}</div><div class="lab">Phiếu trắng</div></div>
+          <div class="tnum blank"><div class="n">${tally.blank || 0}</div><div class="lab">Không bỏ phiếu</div></div>
         </div>
         <div class="bar"><div class="fill" style="width:${yesPct}%"></div></div>
         <div class="total-line">TỔNG SỐ PHIẾU: ${tally.total}</div>
-        ${doc && doc.status === 'closed' ? `<div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${yesPct}%</div>` : ''}
+        <div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${tally.total > 0 ? `${yesPct}%` : '0%'} trên tổng số phiếu</div>
       </div>
     </div>
   `;
@@ -387,7 +388,7 @@ function renderVoter() {
   document.getElementById('back').onclick = backToRoleSelect;
 
   const area = document.getElementById('vote-area');
-  const currentChoiceText = myVoteStatus.choice === 'yes' ? 'ĐỒNG Ý' : (myVoteStatus.choice === 'no' ? 'KHÔNG ĐỒNG Ý' : 'PHIẾU TRẮNG');
+  const currentChoiceText = myVoteStatus.choice === 'yes' ? 'ĐỒNG Ý' : (myVoteStatus.choice === 'no' ? 'KHÔNG ĐỒNG Ý' : 'KHÔNG BỎ PHIẾU');
   const haveVote = votedForThisDoc;
 
   area.innerHTML = `
@@ -401,7 +402,7 @@ function renderVoter() {
     <div class="vote-buttons">
       <button class="vote-btn yes" id="v-yes">✓ Đồng ý</button>
       <button class="vote-btn no" id="v-no">✕ Không đồng ý</button>
-      <button class="vote-btn blank" id="v-blank">○ Phiếu trắng</button>
+      <button class="vote-btn blank" id="v-blank">○ Không bỏ phiếu</button>
     </div>
   `;
   document.getElementById('v-yes').onclick = () => socket.emit('voter:vote', { choice: 'yes' });
@@ -428,11 +429,11 @@ function renderDisplay() {
         <div class="tally-nums">
           <div class="tnum yes"><div class="n">${tally.yes}</div><div class="lab">Đồng ý</div></div>
           <div class="tnum no"><div class="n">${tally.no}</div><div class="lab">Không đồng ý</div></div>
-          <div class="tnum blank"><div class="n">${tally.blank || 0}</div><div class="lab">Phiếu trắng</div></div>
+          <div class="tnum blank"><div class="n">${tally.blank || 0}</div><div class="lab">Không bỏ phiếu</div></div>
         </div>
         <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
         <div class="total-line">TỔNG SỐ PHIẾU: ${tally.total}</div>
-        ${doc && doc.status === 'closed' ? `<div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${pct}%</div>` : ''}
+        <div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${tally.total > 0 ? `${pct}%` : '0%'} trên tổng số phiếu</div>
       </div>
       <div class="display-right">
         <div class="card panel vote-list-panel">
@@ -442,7 +443,7 @@ function renderDisplay() {
               <div class="vote-list-item">
                 <div class="vote-list-name">${escapeHtml(item.name)}</div>
                 <div class="vote-list-meta">
-                  <span class="vote-pill ${item.choice === 'yes' ? 'yes' : (item.choice === 'no' ? 'no' : 'blank')}">${item.choice === 'yes' ? 'Đồng ý' : (item.choice === 'no' ? 'Không đồng ý' : 'Phiếu trắng')}</span>
+                  <span class="vote-pill ${item.choice === 'yes' ? 'yes' : (item.choice === 'no' ? 'no' : 'blank')}">${item.choice === 'yes' ? 'Đồng ý' : (item.choice === 'no' ? 'Không đồng ý' : 'Không bỏ phiếu')}</span>
                   <span class="vote-time">${escapeHtml(formatVoteTime(item.votedAt))}</span>
                 </div>
               </div>
