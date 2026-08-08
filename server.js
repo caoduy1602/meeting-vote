@@ -8,9 +8,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const ExcelJS = require('exceljs');
 const { Pool } = require('pg');
+const { getAdminPassword, loadVoters } = require('./lib/config');
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = getAdminPassword(process.env);
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-please';
 const DATABASE_URL = process.env.DATABASE_URL || null;
 
@@ -50,19 +51,7 @@ function writeJsonFileAtomic(filePath, data) {
 }
 
 // ---------- Load fixed voter list ----------
-function loadVoters() {
-  if (!fs.existsSync(VOTERS_FILE)) {
-    console.warn('[!] Khong tim thay config/voters.json — hay copy tu voters.example.json va chinh sua.');
-    return [];
-  }
-  try {
-    return JSON.parse(fs.readFileSync(VOTERS_FILE, 'utf-8'));
-  } catch (e) {
-    console.error('Loi doc voters.json:', e.message);
-    return [];
-  }
-}
-let VOTERS = loadVoters();
+let VOTERS = loadVoters(VOTERS_FILE);
 
 function normalizeVoterName(name) {
   return String(name || '').trim().toLowerCase();

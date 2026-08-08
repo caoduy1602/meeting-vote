@@ -1,14 +1,8 @@
 node_modules/
 .env
 .DS_Store
-data/
 .vscode/
 npm-debug.log
 dist/
-node_modules/
-.env
-data/data.json
-config/voters.json
-
 .vercel
 .env*
