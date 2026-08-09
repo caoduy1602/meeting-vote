@@ -435,30 +435,28 @@ function renderDisplay() {
         <div class="total-line">TỔNG SỐ PHIẾU: ${tally.total}</div>
         <div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${tally.total > 0 ? `${pct}%` : '0%'} trên tổng số phiếu</div>
       </div>
-      <div class="display-right">
-        <div class="card panel vote-list-panel">
-          <h3>Danh sách đã bỏ phiếu</h3>
-          <div class="vote-list">
-            ${votedList.length ? votedList.map(item => `
-              <div class="vote-list-item">
-                <div class="vote-list-name">${escapeHtml(item.name)}</div>
-                <div class="vote-list-meta">
-                  <span class="vote-pill ${item.choice === 'yes' ? 'yes' : (item.choice === 'no' ? 'no' : 'blank')}">${item.choice === 'yes' ? 'Đồng ý' : (item.choice === 'no' ? 'Không đồng ý' : 'Không bỏ phiếu')}</span>
-                  <span class="vote-time">${escapeHtml(formatVoteTime(item.votedAt))}</span>
-                </div>
+      <div class="card panel vote-list-panel">
+        <h3>Danh sách đã bỏ phiếu</h3>
+        <div class="vote-list">
+          ${votedList.length ? votedList.map(item => `
+            <div class="vote-list-item">
+              <div class="vote-list-name">${escapeHtml(item.name)}</div>
+              <div class="vote-list-meta">
+                <span class="vote-pill ${item.choice === 'yes' ? 'yes' : (item.choice === 'no' ? 'no' : 'blank')}">${item.choice === 'yes' ? 'Đồng ý' : (item.choice === 'no' ? 'Không đồng ý' : 'Không bỏ phiếu')}</span>
+                <span class="vote-time">${escapeHtml(formatVoteTime(item.votedAt))}</span>
               </div>
-            `).join('') : '<div class="empty">Chưa có người nào bỏ phiếu.</div>'}
-          </div>
+            </div>
+          `).join('') : '<div class="empty">Chưa có người nào bỏ phiếu.</div>'}
         </div>
-        <div class="card panel vote-list-panel unvoted-panel">
-          <h3>Danh sách chưa bỏ phiếu</h3>
-          <div class="vote-list">
-            ${unvotedList.length ? unvotedList.map(item => `
-              <div class="vote-list-item">
-                <div class="vote-list-name">${escapeHtml(item.name)}</div>
-              </div>
-            `).join('') : '<div class="empty">Tất cả đã tham gia bỏ phiếu.</div>'}
-          </div>
+      </div>
+      <div class="card panel vote-list-panel unvoted-panel">
+        <h3>Danh sách chưa bỏ phiếu</h3>
+        <div class="vote-list">
+          ${unvotedList.length ? unvotedList.map(item => `
+            <div class="vote-list-item">
+              <div class="vote-list-name">${escapeHtml(item.name)}</div>
+            </div>
+          `).join('') : '<div class="empty">Tất cả đã tham gia bỏ phiếu.</div>'}
         </div>
       </div>
     </div>

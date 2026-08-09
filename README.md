@@ -60,6 +60,7 @@ Mở trình duyệt tại `http://localhost:3000`.
    - `SESSION_SECRET` — key cho JWT
    - `DATA_DIR=/opt/render/project/src/data`
 5. Tạo Persistent Disk trên Render và mount nó vào `Mount Path: /opt/render/project/src/data`.
+   - Ứng dụng sẽ tự động dùng thư mục này nếu nó tồn tại.
 6. Nếu muốn dùng danh sách người biểu quyết thay đổi mà không deploy lại, có thể đặt `config/voters.json` trong repo hoặc dùng `VOTERS_FILE` để trỏ đến file JSON riêng trên disk.
 
 **Lưu ý về ổ đĩa:** `DATA_DIR` phải trỏ tới thư mục trên Render Persistent Disk. Dữ liệu JSON runtime sẽ nằm ngoài source code và không bị mất khi redeploy, restart, hoặc crash.

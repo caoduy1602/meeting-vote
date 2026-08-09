@@ -16,8 +16,9 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-please';
 const DATABASE_URL = process.env.DATABASE_URL || null;
 
 const DEFAULT_DATA_DIR = path.join(__dirname, 'data');
+const DEFAULT_RENDER_DATA_DIR = path.resolve('/opt/render/project/src/data');
 const REQUESTED_DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : null;
-const DATA_DIR = REQUESTED_DATA_DIR || DEFAULT_DATA_DIR;
+const DATA_DIR = REQUESTED_DATA_DIR || (fs.existsSync(DEFAULT_RENDER_DATA_DIR) ? DEFAULT_RENDER_DATA_DIR : DEFAULT_DATA_DIR);
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const LEGACY_DATA_FILE = path.join(__dirname, 'data', 'data.json');
 const VOTERS_FILE = process.env.VOTERS_FILE
@@ -39,6 +40,7 @@ function writeJsonFileAtomic(filePath, data) {
   writeJsonQueue = writeJsonQueue
     .catch(() => {})
     .then(async () => {
+      console.log(`[DATA] Writing data to ${filePath}`);
       await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
       if (fs.existsSync(filePath)) {
         await fs.promises.copyFile(filePath, backupFile);
@@ -138,11 +140,13 @@ async function loadData() {
       if (!fs.existsSync(DATA_FILE)) {
         const init = normalizeState({ documents: [], votes: {}, currentDocId: null, templates: [] });
         await writeJsonFileAtomic(DATA_FILE, init);
+        console.log(`[DATA] Da khoi tao file du lieu: ${DATA_FILE}`);
         return init;
       }
     }
 
     try {
+      console.log(`[DATA] Loading data from ${DATA_FILE}`);
       const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
       return normalizeState(data);
     } catch (err) {
