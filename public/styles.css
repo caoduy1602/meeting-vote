@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@700&display=swap');
 :root{
   --navy:#0F1B33;
   --paper:#F5F1E4;
@@ -19,7 +20,10 @@ body{
     radial-gradient(ellipse at 20% -10%, rgba(198,161,91,0.08), transparent 55%),
     repeating-linear-gradient(180deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 48px),
     var(--navy);
-  color:var(--ink);font-family:'Inter',sans-serif;padding:32px 16px;
+  color:var(--ink);
+  font-family:'Lora',serif;
+  font-weight:700;
+  padding:32px 16px;
 }
 
 .admin-bg {
