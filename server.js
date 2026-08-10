@@ -351,101 +351,109 @@ app.get('/api/state', (req, res) => res.json(publicState()));
 
 // Xuất báo cáo toàn bộ các công văn đã/đang biểu quyết ra Excel — chỉ admin
 app.get('/api/export', requireAdmin, async (req, res) => {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = 'Meeting Vote';
-  wb.created = new Date();
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Meeting Vote';
+    wb.created = new Date();
 
-  const summary = wb.addWorksheet('Tổng hợp');
-  const summaryHeaders = [
-    'Công văn',
-    'Trạng thái',
-    'Đồng ý',
-    'Không đồng ý',
-    'Phiếu trắng',
-    'Tổng phiếu',
-    'Tỷ lệ đồng ý (%)',
-    'Kết quả'
-  ];
-  summary.columns = [
-    { header: summaryHeaders[0], key: 'title', width: 40 },
-    { header: summaryHeaders[1], key: 'status', width: 15 },
-    { header: summaryHeaders[2], key: 'yes', width: 10 },
-    { header: summaryHeaders[3], key: 'no', width: 14 },
-    { header: summaryHeaders[4], key: 'blank', width: 12 },
-    { header: summaryHeaders[5], key: 'total', width: 12 },
-    { header: summaryHeaders[6], key: 'yesPercent', width: 16 },
-    { header: summaryHeaders[7], key: 'result', width: 15 },
-  ];
-
-  const summaryRows = [];
-  for (const d of DB.documents) {
-    const t = tallyFor(d.id);
-    const yesPercent = yesPercent(t);
-    let result = '—';
-    if (d.status === 'closed') result = t.yes > t.no ? 'Thông qua' : (t.yes === t.no ? 'Hoà' : 'Không qua');
-    summaryRows.push({
-      title: d.title,
-      status: d.status === 'open' ? 'Đang mở' : 'Đã đóng',
-      yes: t.yes,
-      no: t.no,
-      blank: t.blank,
-      total: t.total,
-      yesPercent: `${(yesPercent * 100).toFixed(0)}%`,
-      result
-    });
-
-    const baseSheetName = d.title.replace(/[\\/*?:\[\]]/g, '').slice(0, 24) || d.id;
-    const sheetName = baseSheetName.length > 31 ? baseSheetName.slice(0, 31) : baseSheetName;
-    const existingNames = new Set(wb.worksheets.map(ws => ws.name));
-    let finalSheetName = sheetName;
-    let suffix = 2;
-    while (existingNames.has(finalSheetName)) {
-      finalSheetName = `${sheetName.slice(0, 31 - String(suffix).length - 1)}_${suffix}`;
-      suffix += 1;
-    }
-    existingNames.add(finalSheetName);
-    const sheet = wb.addWorksheet(finalSheetName);
-    sheet.columns = [
-      { header: 'Người biểu quyết', key: 'name', width: 28 },
-      { header: 'Lựa chọn', key: 'choice', width: 20 },
+    const summary = wb.addWorksheet('Tổng hợp');
+    const summaryHeaders = [
+      'Công văn',
+      'Trạng thái',
+      'Đồng ý',
+      'Không đồng ý',
+      'Phiếu trắng',
+      'Tổng phiếu',
+      'Tỷ lệ đồng ý (%)',
+      'Kết quả'
     ];
-    sheet.getRow(1).font = { bold: true };
-    const votes = DB.votes[d.id] || {};
-    const voterIds = Array.from(new Set([...VOTERS.map(v => v.id), ...Object.keys(votes)]));
-    for (const voterId of voterIds) {
-      const voter = VOTERS.find(v => v.id === voterId);
-      const voteEntry = votes[voterId];
-      const normalizedVote = normalizeVoteEntry(voteEntry);
-      const choice = normalizedVote.choice;
-      sheet.addRow({
-        name: normalizedVote.name || (voter ? voter.name : voterId),
-        choice: choice === 'yes' ? 'Đồng ý' : (choice === 'no' ? 'Không đồng ý' : (choice === 'blank' ? 'Phiếu trắng' : 'Chưa bỏ phiếu'))
+    summary.columns = [
+      { header: summaryHeaders[0], key: 'title', width: 40 },
+      { header: summaryHeaders[1], key: 'status', width: 15 },
+      { header: summaryHeaders[2], key: 'yes', width: 10 },
+      { header: summaryHeaders[3], key: 'no', width: 14 },
+      { header: summaryHeaders[4], key: 'blank', width: 12 },
+      { header: summaryHeaders[5], key: 'total', width: 12 },
+      { header: summaryHeaders[6], key: 'yesPercent', width: 16 },
+      { header: summaryHeaders[7], key: 'result', width: 15 },
+    ];
+
+    const summaryRows = [];
+    for (const d of DB.documents) {
+      const t = tallyFor(d.id);
+      const approvalPercent = yesPercent(t);
+      let result = '—';
+      if (d.status === 'closed') result = t.yes > t.no ? 'Thông qua' : (t.yes === t.no ? 'Hoà' : 'Không qua');
+      summaryRows.push({
+        title: d.title,
+        status: d.status === 'open' ? 'Đang mở' : 'Đã đóng',
+        yes: t.yes,
+        no: t.no,
+        blank: t.blank,
+        total: t.total,
+        yesPercent: `${(approvalPercent * 100).toFixed(0)}%`,
+        result
       });
+
+      const baseSheetName = String(d.title || d.id).replace(/[\\/*?:\[\]]/g, '').slice(0, 24) || d.id;
+      const sheetName = baseSheetName.length > 31 ? baseSheetName.slice(0, 31) : baseSheetName;
+      const existingNames = new Set(wb.worksheets.map(ws => ws.name));
+      let finalSheetName = sheetName;
+      let suffix = 2;
+      while (existingNames.has(finalSheetName)) {
+        finalSheetName = `${sheetName.slice(0, 31 - String(suffix).length - 1)}_${suffix}`;
+        suffix += 1;
+      }
+      existingNames.add(finalSheetName);
+      const sheet = wb.addWorksheet(finalSheetName);
+      sheet.columns = [
+        { header: 'Người biểu quyết', key: 'name', width: 28 },
+        { header: 'Lựa chọn', key: 'choice', width: 20 },
+      ];
+      sheet.getRow(1).font = { bold: true };
+      const votes = DB.votes[d.id] || {};
+      const voterIds = Array.from(new Set([...VOTERS.map(v => v.id), ...Object.keys(votes)]));
+      for (const voterId of voterIds) {
+        const voter = VOTERS.find(v => v.id === voterId);
+        const voteEntry = votes[voterId];
+        const normalizedVote = normalizeVoteEntry(voteEntry);
+        const choice = normalizedVote.choice;
+        sheet.addRow({
+          name: normalizedVote.name || (voter ? voter.name : voterId),
+          choice: choice === 'yes' ? 'Đồng ý' : (choice === 'no' ? 'Không đồng ý' : (choice === 'blank' ? 'Phiếu trắng' : 'Chưa bỏ phiếu'))
+        });
+      }
+    }
+
+    summary.getRow(1).values = summaryHeaders;
+    summary.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    summary.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B5E3C' } };
+    summary.addRows(summaryRows);
+    if (summary.rowCount < 2) {
+      summary.addRow({ title: '', status: '', yes: '', no: '', blank: '', total: '', yesPercent: '', result: '' });
+    }
+    summary.eachRow((row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFBDBDBD' } },
+          left: { style: 'thin', color: { argb: 'FFBDBDBD' } },
+          bottom: { style: 'thin', color: { argb: 'FFBDBDBD' } },
+          right: { style: 'thin', color: { argb: 'FFBDBDBD' } }
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="bao-cao-bieu-quyet.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('[EXPORT] Không thể tạo file Excel:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Không thể tạo file Excel' });
     }
   }
-
-  summary.getRow(1).values = summaryHeaders;
-  summary.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  summary.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B5E3C' } };
-  summary.addRows(summaryRows);
-  if (summary.rowCount < 2) {
-    summary.addRow({ title: '', status: '', yes: '', no: '', blank: '', total: '', yesPercent: '', result: '' });
-  }
-  summary.eachRow((row) => {
-    row.eachCell({ includeEmpty: true }, (cell) => {
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFBDBDBD' } },
-        left: { style: 'thin', color: { argb: 'FFBDBDBD' } },
-        bottom: { style: 'thin', color: { argb: 'FFBDBDBD' } },
-        right: { style: 'thin', color: { argb: 'FFBDBDBD' } }
-      };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    });
-  });
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="bao-cao-bieu-quyet.xlsx"');
-  await wb.xlsx.write(res);
-  res.end();
 });
 
 const server = http.createServer(app);

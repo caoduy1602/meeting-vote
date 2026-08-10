@@ -63,6 +63,29 @@ function rerenderCurrentView() {
   if (session.role === 'display') return renderDisplay();
 }
 
+function downloadBlobAsFile(blob, fallbackName) {
+  const url = URL.createObjectURL(blob);
+  const popup = window.open('', '_blank');
+  if (popup) {
+    popup.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return;
+  }
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fallbackName;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 1500);
+}
+
 // ---------------- ROLE SELECT ----------------
 function renderRoleSelect() {
   if (socket) { socket.disconnect(); socket = null; }
@@ -299,17 +322,29 @@ function renderAdmin() {
     </div>
   `;
   document.getElementById('back').onclick = backToRoleSelect;
-  document.getElementById('export-btn').onclick = () => {
-    fetch('/api/export', { headers: { Authorization: 'Bearer ' + session.token } })
-      .then(r => r.ok ? r.blob() : Promise.reject(r))
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'bao-cao-bieu-quyet.xlsx';
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
-      })
-      .catch(() => alert('Không xuất được báo cáo'));
+  document.getElementById('export-btn').onclick = async () => {
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) exportBtn.disabled = true;
+    try {
+      const r = await fetch('/api/export', {
+        headers: { Authorization: 'Bearer ' + session.token },
+        cache: 'no-store'
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(text || 'Không xuất được báo cáo');
+      }
+      const blob = await r.blob();
+      const contentDisposition = r.headers.get('content-disposition') || '';
+      const filenameMatch = contentDisposition.match(/filename\s*=\s*"?([^";]+)"?/i);
+      const filename = filenameMatch ? filenameMatch[1] : 'bao-cao-bieu-quyet.xlsx';
+      downloadBlobAsFile(blob, filename);
+    } catch (e) {
+      console.error('Export failed', e);
+      alert(e.message || 'Không xuất được báo cáo');
+    } finally {
+      if (exportBtn) exportBtn.disabled = false;
+    }
   };
   document.querySelectorAll('.delete-history-item').forEach(btn => {
     btn.onclick = () => {
