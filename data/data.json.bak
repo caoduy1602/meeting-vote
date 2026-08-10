@@ -1,6 +1,16 @@
 {
   "documents": [
     {
+      "id": "d_msmk75w0bvm7",
+      "title": "123",
+      "content": "111111",
+      "status": "open",
+      "createdAt": 1786325697936,
+      "yes": 0,
+      "no": 0,
+      "blank": 0
+    },
+    {
       "id": "d_mskkzdyf3g7e",
       "title": "công văn số 12345/HDND ngày 02/07/2026 của UBND xã Quảng Hà",
       "content": "sao cũng được",
@@ -19,8 +29,16 @@
         "name": "Hoàng Trung Kiên",
         "votedAt": 1786206102583
       }
-    }
+    },
+    "d_msmk75w0bvm7": {}
   },
-  "currentDocId": "d_mskkzdyf3g7e",
-  "templates": []
+  "currentDocId": "d_msmk75w0bvm7",
+  "templates": [
+    {
+      "id": "tpl_mskl0hoyyqbr",
+      "title": "123",
+      "content": "111111",
+      "createdAt": 1786206133906
+    }
+  ]
 }
