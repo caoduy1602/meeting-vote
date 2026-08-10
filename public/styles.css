@@ -150,6 +150,11 @@ h1.title{font-family:'Playfair Display',serif;font-weight:900;color:#EFE7D2;text
   overflow-wrap:break-word;
   word-break:break-word;
 }
+/* Tiêu đề công văn tại màn hình chiếu dùng Lora Bold */
+.display-layout .tally-wrap h2{
+  font-family:'Lora',serif;
+  font-weight:700;
+}
 .display-card-title{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:#000000;margin-bottom:12px;}
 .display-doc-content{font-size:16px;color:#000000;line-height:1.65;margin:0 0 16px 0;}
 .panel .desc{font-size:15px;color:#6b6250;margin-bottom:20px;}
@@ -298,7 +303,7 @@ input:focus, textarea:focus, select:focus, button:focus-visible{outline:2px soli
 .waiting .dot:nth-child(3){animation-delay:.4s;}
 @keyframes blink{0%,80%,100%{opacity:.25;}40%{opacity:1;}}
 .waiting p{color:#6b6250;font-size:13.5px;margin-top:16px;}
-.voter-title{font-family:'Playfair Display',serif;font-weight:900;font-size:24px;margin:6px 0 12px 0;color:#1f1a13;text-shadow:0 1px 0 rgba(255,255,255,0.35);}
+.voter-title{font-family:'Lora',serif;font-weight:700;font-size:24px;margin:6px 0 12px 0;color:#1f1a13;text-shadow:0 1px 0 rgba(255,255,255,0.35);}
 .voter-content{font-size:14.5px;color:#4a4433;line-height:1.7;white-space:pre-wrap;text-align:left;background:#fffdf8;border:1px solid var(--line);border-radius:3px;padding:16px;margin-bottom:24px;}
 .vote-buttons{display:flex;gap:14px;flex-wrap:wrap;}
 .vote-btn{flex:1;min-width:140px;padding:20px 10px;border-radius:4px;border:2px solid;font-family:'Inter',sans-serif;font-weight:700;font-size:16px;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;}
