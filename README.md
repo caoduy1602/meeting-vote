@@ -137,3 +137,34 @@ meeting-vote/
 - Chuyển `data/data.json` sang SQLite hoặc Postgres nếu số lượng công văn
   và người dùng lớn.
 - Thêm giới hạn thời gian biểu quyết (đếm ngược tự động đóng phiên).
+
+## Tự động sao lưu dữ liệu bằng GitHub (miễn phí)
+
+Ứng dụng có cơ chế sao lưu `data/data.json` lên một branch riêng (`data-backups`) trong cùng repo trên GitHub. Khi ứng dụng khởi động, nếu không tìm thấy `data/data.json` cục bộ nó sẽ thử tải về từ branch này. Khi lưu, app sẽ upload (non-blocking) lên GitHub nếu biến môi trường cấu hình sẵn.
+
+Biến môi trường cần thêm trên Render (hoặc môi trường production):
+- `GITHUB_PERSIST_REPO` = owner/repo (ví dụ `caoduy1602/meeting-vote`)
+- `GITHUB_PERSIST_BRANCH` = `data-backups`
+- `GITHUB_DATA_PATH` = `data/data.json`
+- `GITHUB_TOKEN` = GitHub Personal Access Token (scope: `repo` or `public_repo`)
+
+Nếu bạn muốn script tự đặt các biến này trên Render (qua API), dùng file `scripts/set_render_env.ps1` từ repository — chạy trên máy Windows với PowerShell:
+
+```powershell
+# ví dụ
+# $env:RENDER_API_KEY = '<your_render_api_key>'
+# .\scripts\set_render_env.ps1 -ServiceId 'srv-xxxx' -Repo 'owner/repo' -GithubToken '<your_github_pat>'
+```
+
+Hoặc, thêm thủ công các biến môi trường trên Render Dashboard: Service → Environment → Add Variable → Save → Redeploy.
+
+Sau khi hoàn tất, bạn có thể trigger một backup thủ công (đợi tới khi deploy xong) bằng cách gửi POST tới endpoint admin:
+
+```
+POST /api/admin/backup
+Authorization: Bearer <admin-token>
+```
+
+Cuối cùng, có GitHub Action mẫu `.github/workflows/verify-backup.yml` để kiểm tra branch `data-backups` tồn tại và (tuỳ chọn) trigger redeploy trên Render nếu bạn lưu `RENDER_API_KEY` và `RENDER_SERVICE_ID` trong `Secrets` của repo.
+
+Nhớ: sau khi xác thực xong, xoá hoặc rotate token bạn đã tạo để giữ an toàn.

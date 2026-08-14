@@ -1,0 +1,37 @@
+name: Verify Backup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch backup branch
+        run: |
+          git fetch origin data-backups || true
+
+      - name: Check for backup file
+        run: |
+          if git show origin/data-backups:data/data.json > backup.json 2>/dev/null; then
+            echo "Backup exists";
+            ls -l backup.json
+            echo "::set-output name=has_backup::true"
+          else
+            echo "No backup file found on data-backups branch" 1>&2
+            exit 1
+          fi
+
+      - name: Optionally trigger Render redeploy
+        if: ${{ secrets.RENDER_API_KEY && secrets.RENDER_SERVICE_ID }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          echo "Triggering render deploy..."
+          curl -s -X POST -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/$SERVICE_ID/deploys" -H 'accept: application/json' -d '{}' | jq .

@@ -55,6 +55,17 @@ function writeJsonFileAtomic(filePath, data) {
 // ---------- Load fixed voter list ----------
 let VOTERS = loadVoters(VOTERS_FILE);
 
+// GitHub persistence config (optional)
+const GITHUB_PERSIST_REPO = process.env.GITHUB_PERSIST_REPO || null; // owner/repo
+const GITHUB_PERSIST_BRANCH = process.env.GITHUB_PERSIST_BRANCH || 'data-backups';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || null;
+const GITHUB_DATA_PATH = process.env.GITHUB_DATA_PATH || 'data/data.json';
+let githubPersist = null;
+try {
+  githubPersist = require('./lib/persist_github');
+} catch (e) {
+  githubPersist = null;
+}
 function normalizeVoterName(name) {
   return String(name || '').trim().toLowerCase();
 }
@@ -128,6 +139,25 @@ async function loadData() {
     ensureDirectoryExists(DATA_DIR);
 
     if (!fs.existsSync(DATA_FILE)) {
+      // If local data file missing, try to fetch from GitHub backup (non-blocking fallback)
+      if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
+        try {
+          console.log('[DATA] Local data missing — thử fetch từ GitHub backup');
+          const remote = await githubPersist.getFileFromRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN);
+          if (remote && remote.content) {
+            try {
+              const parsed = JSON.parse(remote.content);
+              await writeJsonFileAtomic(DATA_FILE, parsed);
+              console.log('[DATA] Da tai du lieu tu GitHub sang local.');
+              return normalizeState(parsed);
+            } catch (err) {
+              console.error('[DATA] Loi khi parse noi dung GitHub:', err.message);
+            }
+          }
+        } catch (err) {
+          console.error('[DATA] Khong the fetch tu GitHub:', err.message);
+        }
+      }
       if (REQUESTED_DATA_DIR && REQUESTED_DATA_DIR !== DEFAULT_DATA_DIR && fs.existsSync(LEGACY_DATA_FILE)) {
         try {
           fs.copyFileSync(LEGACY_DATA_FILE, DATA_FILE);
@@ -196,6 +226,18 @@ async function saveData(data) {
     ensureDirectoryExists(DATA_DIR);
     await writeJsonFileAtomic(DATA_FILE, normalized);
     DB = normalized;
+    // Spawn async upload to GitHub if configured. Do not block main flow.
+    if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
+      (async () => {
+        try {
+          const content = JSON.stringify(normalized, null, 2);
+          await githubPersist.putFileToRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN, content, 'Auto backup data.json');
+          console.log('[DATA] Backup data.json -> GitHub completed.');
+        } catch (err) {
+          console.error('[DATA] Backup to GitHub failed:', err.message);
+        }
+      })();
+    }
     return normalized;
   }
 
@@ -453,6 +495,31 @@ app.get('/api/export', requireAdmin, async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ error: 'Không thể tạo file Excel' });
     }
+  }
+});
+
+// ---------- Admin: trigger immediate backup (synchronous) ----------
+app.post('/api/admin/backup', requireAdmin, async (req, res) => {
+  try {
+    // Ensure local file is up-to-date
+    await writeJsonFileAtomic(DATA_FILE, DB);
+
+    // If GitHub persistence is configured, push the file and wait for completion
+    if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
+      try {
+        const content = JSON.stringify(DB, null, 2);
+        await githubPersist.putFileToRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN, content, 'Manual backup data.json');
+        return res.json({ ok: true, github: true });
+      } catch (err) {
+        console.error('[ADMIN-BACKUP] Backup to GitHub failed:', err.message);
+        return res.status(500).json({ ok: false, error: 'GitHub backup failed', detail: err.message });
+      }
+    }
+
+    return res.json({ ok: true, github: false });
+  } catch (err) {
+    console.error('[ADMIN-BACKUP] Error during backup:', err.message);
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
