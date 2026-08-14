@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
+    ,"test:persistence": "node test/persistence.test.js"
   },
   "dependencies": {
     "axios": "^1.19.0",

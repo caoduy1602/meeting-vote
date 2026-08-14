@@ -96,6 +96,7 @@ let DB = {
   currentDocId: null,
   templates: []
 };
+let dbAvailable = false;
 
 function normalizeState(data) {
   const safeData = data && typeof data === 'object' ? data : {};
@@ -130,9 +131,14 @@ async function initializeDatabase() {
   ensureDbConfigured();
   try {
     await pool.query('SELECT 1');
+    console.log('[DB] PostgreSQL: CONNECTED');
+    dbAvailable = true;
   } catch (err) {
     console.error('[DB] Khong the ket noi PostgreSQL:', err.message);
-    throw err;
+    console.log('[DB] PostgreSQL: NOT CONFIGURED - using data.json fallback');
+    dbAvailable = false;
+    // Do not throw — allow application to continue using data.json as fallback
+    return;
   }
 
   await pool.query(`
@@ -217,6 +223,76 @@ async function loadData() {
   }
 
   await initializeDatabase();
+  if (!dbAvailable) {
+    // Fallback to file-based persistence if DB not available
+    ensureDirectoryExists(DATA_DIR);
+
+    if (!fs.existsSync(DATA_FILE)) {
+      // If local data file missing, try to fetch from configured remote backups (GitHub first, then generic remote)
+      if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
+        try {
+          console.log('[DATA] Local data missing — thử fetch từ GitHub backup');
+          const remote = await githubPersist.getFileFromRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN);
+          if (remote && remote.content) {
+            try {
+              const parsed = JSON.parse(remote.content);
+              await writeJsonFileAtomic(DATA_FILE, parsed);
+              console.log('[DATA] Da tai du lieu tu GitHub sang local.');
+              return normalizeState(parsed);
+            } catch (err) {
+              console.error('[DATA] Loi khi parse noi dung GitHub:', err.message);
+            }
+          }
+        } catch (err) {
+          console.error('[DATA] Khong the fetch tu GitHub:', err.message);
+        }
+      }
+      if (REMOTE_PERSIST_URL && remotePersist) {
+        try {
+          console.log('[DATA] Local data missing — thử fetch từ REMOTE_PERSIST_URL');
+          const remote = await remotePersist.getFromRemote(REMOTE_PERSIST_URL, REMOTE_PERSIST_AUTH);
+          if (remote && remote.content) {
+            try {
+              const parsed = JSON.parse(remote.content);
+              await writeJsonFileAtomic(DATA_FILE, parsed);
+              console.log('[DATA] Da tai du lieu tu REMOTE_PERSIST sang local.');
+              return normalizeState(parsed);
+            } catch (err) {
+              console.error('[DATA] Loi khi parse noi dung REMOTE_PERSIST:', err.message);
+            }
+          }
+        } catch (err) {
+          console.error('[DATA] Khong the fetch tu REMOTE_PERSIST:', err.message);
+        }
+      }
+      if (REQUESTED_DATA_DIR && REQUESTED_DATA_DIR !== DEFAULT_DATA_DIR && fs.existsSync(LEGACY_DATA_FILE)) {
+        try {
+          fs.copyFileSync(LEGACY_DATA_FILE, DATA_FILE);
+          console.log(`[DATA] Da copy du lieu cu tu ${LEGACY_DATA_FILE} sang ${DATA_FILE}`);
+        } catch (err) {
+          console.error('[DATA] Khong the copy du lieu cu:', err.message);
+        }
+      }
+
+      if (!fs.existsSync(DATA_FILE)) {
+        const init = normalizeState({ documents: [], votes: {}, currentDocId: null, templates: [] });
+        await writeJsonFileAtomic(DATA_FILE, init);
+        console.log(`[DATA] Da khoi tao file du lieu: ${DATA_FILE}`);
+        return init;
+      }
+    }
+
+    try {
+      console.log(`[DATA] Loading data from ${DATA_FILE}`);
+      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      return normalizeState(data);
+    } catch (err) {
+      console.error('[DB] Khong the doc data.json:', err.message);
+      throw err;
+    }
+  }
+
+  console.log('[DB] Loading state from PostgreSQL');
   const result = await pool.query(`
     SELECT documents, votes, current_doc_id, templates
     FROM meeting_vote_state
@@ -236,6 +312,7 @@ async function loadData() {
   if (fs.existsSync(DATA_FILE)) {
     try {
       const legacyData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      console.log('[DB] Importing existing data.json into PostgreSQL');
       const imported = normalizeState(legacyData);
       await saveData(imported);
       console.log(`[DB] Da import du lieu tu ${path.relative(__dirname, DATA_FILE)} vao PostgreSQL.`);
@@ -282,8 +359,27 @@ async function saveData(data) {
   }
 
   ensureDbConfigured();
-  try {
-    await pool.query(`
+  // Retry logic with exponential backoff for transient DB errors
+  const maxRetries = 3;
+  const baseDelay = 500; // ms
+
+  function isTransientError(err) {
+    if (!err) return false;
+    const code = err.code || '';
+    const msg = (err.message || '').toLowerCase();
+    // Common transient network/connection errors
+    const transientCodes = ['econnrefused', 'econnreset', 'etimedout', 'ehostunreach', 'econnaborted'];
+    const pgTransientCodes = ['57p01', '57p02', '53400', '08006', '08001', '08003', '08004'];
+    if (transientCodes.includes(String(code).toLowerCase())) return true;
+    if (pgTransientCodes.includes(String(code).toLowerCase())) return true;
+    if (msg.includes('terminating connection') || msg.includes('connection terminated') || msg.includes('timeout') || msg.includes('connect')) return true;
+    return false;
+  }
+
+  let lastErr = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      await pool.query(`
       INSERT INTO meeting_vote_state (id, documents, votes, current_doc_id, templates, updated_at)
       VALUES (1, $1::jsonb, $2::jsonb, $3, $4::jsonb, NOW())
       ON CONFLICT (id) DO UPDATE SET
@@ -293,14 +389,29 @@ async function saveData(data) {
         templates = EXCLUDED.templates,
         updated_at = NOW()
     `, [
-      JSON.stringify(normalized.documents),
-      JSON.stringify(normalized.votes),
-      normalized.currentDocId,
-      JSON.stringify(normalized.templates)
-    ]);
-  } catch (err) {
-    console.error('[DB] Khong the luu du lieu vao PostgreSQL:', err.message);
-    throw err;
+        JSON.stringify(normalized.documents),
+        JSON.stringify(normalized.votes),
+        normalized.currentDocId,
+        JSON.stringify(normalized.templates)
+      ]);
+      console.log('[DB] State saved to PostgreSQL');
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      // If not a transient error, break and throw immediately
+      if (!isTransientError(err) || attempt === maxRetries - 1) {
+        console.error('[DB] Khong the luu du lieu vao PostgreSQL:', err.message);
+        throw err;
+      }
+      const delay = baseDelay * Math.pow(2, attempt); // 500, 1000, 2000
+      console.warn(`[DB] Write failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms: ${err.message}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  if (lastErr) {
+    console.error('[DB] All retries failed when saving to PostgreSQL:', lastErr.message);
+    throw lastErr;
   }
 
   DB = normalized;
@@ -697,9 +808,9 @@ async function startServer() {
       console.log(`Meeting-vote server dang chay tai http://localhost:${PORT}`);
     console.log(`[DATA] Su dung DATA_DIR: ${DATA_DIR}`);
     if (usePostgresql()) {
-      console.log('[DB] Dang su dung PostgreSQL.');
+      console.log('[DB] PostgreSQL: CONNECTED');
     } else {
-      console.log('[DB] Chua co DATABASE_URL, dang su dung fallback data.json cho local development.');
+      console.log('[DB] PostgreSQL: NOT CONFIGURED - using data.json fallback');
     }
     if (VOTERS.length === 0) {
       console.log('>> Hay tao file config/voters.json (copy tu voters.example.json) truoc khi dung that.');
