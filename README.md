@@ -61,6 +61,14 @@ Mở trình duyệt tại `http://localhost:3000`.
    - `DATA_DIR=/opt/render/project/src/data`
 5. Tạo Persistent Disk trên Render và mount nó vào `Mount Path: /opt/render/project/src/data`.
    - Ứng dụng sẽ tự động dùng thư mục này nếu nó tồn tại.
+   
+6. (Tùy chọn, được cấu hình sẵn trong `render.yaml`) Bạn có thể provision một
+  PostgreSQL managed database trực tiếp từ `render.yaml`. Khi `DATABASE_URL`
+  được đặt, ứng dụng sẽ tự động chuyển sang lưu trạng thái vào database và
+  (nếu DB rỗng) sẽ import dữ liệu từ `data/data.json` nếu file đó tồn tại.
+  - Nếu bạn deploy qua Render bằng file `render.yaml`, một database tên
+    `meeting-vote-db` sẽ được tạo (kế hoạch `starter`). `DATABASE_URL` sẽ
+    được thiết lập từ connection string của database này.
 6. Nếu muốn dùng danh sách người biểu quyết thay đổi mà không deploy lại, có thể đặt `config/voters.json` trong repo hoặc dùng `VOTERS_FILE` để trỏ đến file JSON riêng trên disk.
 
 **Lưu ý về ổ đĩa:** `DATA_DIR` phải trỏ tới thư mục trên Render Persistent Disk. Dữ liệu JSON runtime sẽ nằm ngoài source code và không bị mất khi redeploy, restart, hoặc crash.
