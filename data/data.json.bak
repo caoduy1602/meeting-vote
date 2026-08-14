@@ -1,0 +1,19 @@
+{
+  "documents": [
+    {
+      "id": "d_msmo4hq6ityr",
+      "title": "CV123",
+      "content": "Test local",
+      "status": "open",
+      "createdAt": 1786332291774,
+      "yes": 0,
+      "no": 0,
+      "blank": 0
+    }
+  ],
+  "votes": {
+    "d_msmo4hq6ityr": {}
+  },
+  "currentDocId": "d_msmo4hq6ityr",
+  "templates": []
+}
