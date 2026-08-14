@@ -66,6 +66,19 @@ try {
 } catch (e) {
   githubPersist = null;
 }
+let remotePersist = null;
+try {
+  remotePersist = require('./lib/persist_remote');
+} catch (e) {
+  remotePersist = null;
+}
+const REMOTE_PERSIST_URL = process.env.REMOTE_PERSIST_URL || null; // e.g. https://example.com/api/v1/backup
+const REMOTE_PERSIST_AUTH = process.env.REMOTE_PERSIST_AUTH || null; // e.g. 'Bearer <token>' or custom header value
+const AUTO_BACKUP_INTERVAL_MS = Number(process.env.AUTO_BACKUP_INTERVAL_MS) || 1000 * 60 * 5; // default 5 minutes
+const crypto = require('crypto');
+let lastBackupHash = null;
+let autoBackupHandle = null;
+let isBackingUp = false;
 function normalizeVoterName(name) {
   return String(name || '').trim().toLowerCase();
 }
@@ -139,8 +152,8 @@ async function loadData() {
     ensureDirectoryExists(DATA_DIR);
 
     if (!fs.existsSync(DATA_FILE)) {
-      // If local data file missing, try to fetch from GitHub backup (non-blocking fallback)
-      if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
+        // If local data file missing, try to fetch from configured remote backups (GitHub first, then generic remote)
+        if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
         try {
           console.log('[DATA] Local data missing — thử fetch từ GitHub backup');
           const remote = await githubPersist.getFileFromRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN);
@@ -158,6 +171,24 @@ async function loadData() {
           console.error('[DATA] Khong the fetch tu GitHub:', err.message);
         }
       }
+        if (REMOTE_PERSIST_URL && remotePersist) {
+          try {
+            console.log('[DATA] Local data missing — thử fetch từ REMOTE_PERSIST_URL');
+            const remote = await remotePersist.getFromRemote(REMOTE_PERSIST_URL, REMOTE_PERSIST_AUTH);
+            if (remote && remote.content) {
+              try {
+                const parsed = JSON.parse(remote.content);
+                await writeJsonFileAtomic(DATA_FILE, parsed);
+                console.log('[DATA] Da tai du lieu tu REMOTE_PERSIST sang local.');
+                return normalizeState(parsed);
+              } catch (err) {
+                console.error('[DATA] Loi khi parse noi dung REMOTE_PERSIST:', err.message);
+              }
+            }
+          } catch (err) {
+            console.error('[DATA] Khong the fetch tu REMOTE_PERSIST:', err.message);
+          }
+        }
       if (REQUESTED_DATA_DIR && REQUESTED_DATA_DIR !== DEFAULT_DATA_DIR && fs.existsSync(LEGACY_DATA_FILE)) {
         try {
           fs.copyFileSync(LEGACY_DATA_FILE, DATA_FILE);
@@ -227,17 +258,26 @@ async function saveData(data) {
     await writeJsonFileAtomic(DATA_FILE, normalized);
     DB = normalized;
     // Spawn async upload to GitHub if configured. Do not block main flow.
-    if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
-      (async () => {
+    // Attempt backup to GitHub and/or remote endpoint (async, non-blocking)
+    (async () => {
+      const content = JSON.stringify(normalized, null, 2);
+      if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
         try {
-          const content = JSON.stringify(normalized, null, 2);
           await githubPersist.putFileToRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN, content, 'Auto backup data.json');
           console.log('[DATA] Backup data.json -> GitHub completed.');
         } catch (err) {
           console.error('[DATA] Backup to GitHub failed:', err.message);
         }
-      })();
-    }
+      }
+      if (REMOTE_PERSIST_URL && remotePersist) {
+        try {
+          await remotePersist.putToRemote(REMOTE_PERSIST_URL, REMOTE_PERSIST_AUTH, content);
+          console.log('[DATA] Backup data.json -> REMOTE_PERSIST completed.');
+        } catch (err) {
+          console.error('[DATA] Backup to REMOTE_PERSIST failed:', err.message);
+        }
+      }
+    })();
     return normalized;
   }
 
@@ -504,19 +544,32 @@ app.post('/api/admin/backup', requireAdmin, async (req, res) => {
     // Ensure local file is up-to-date
     await writeJsonFileAtomic(DATA_FILE, DB);
 
-    // If GitHub persistence is configured, push the file and wait for completion
+    // Try configured persistence targets (GitHub and/or remote endpoint)
+    const results = { github: false, remote: false };
+    const content = JSON.stringify(DB, null, 2);
     if (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) {
       try {
-        const content = JSON.stringify(DB, null, 2);
         await githubPersist.putFileToRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN, content, 'Manual backup data.json');
-        return res.json({ ok: true, github: true });
+        results.github = true;
       } catch (err) {
         console.error('[ADMIN-BACKUP] Backup to GitHub failed:', err.message);
-        return res.status(500).json({ ok: false, error: 'GitHub backup failed', detail: err.message });
       }
     }
 
-    return res.json({ ok: true, github: false });
+    if (REMOTE_PERSIST_URL && remotePersist) {
+      try {
+        await remotePersist.putToRemote(REMOTE_PERSIST_URL, REMOTE_PERSIST_AUTH, content);
+        results.remote = true;
+      } catch (err) {
+        console.error('[ADMIN-BACKUP] Backup to REMOTE_PERSIST failed:', err.message);
+      }
+    }
+
+    if (!results.github && !results.remote) {
+      return res.status(500).json({ ok: false, error: 'No persistence targets succeeded' });
+    }
+
+    return res.json({ ok: true, ...results });
   } catch (err) {
     console.error('[ADMIN-BACKUP] Error during backup:', err.message);
     return res.status(500).json({ ok: false, error: err.message });
@@ -652,6 +705,59 @@ async function startServer() {
       console.log('>> Hay tao file config/voters.json (copy tu voters.example.json) truoc khi dung that.');
     }
   });
+    // Schedule periodic auto-backups if GitHub persistence is configured
+    function scheduleAutoBackup() {
+      if (!( (GITHUB_PERSIST_REPO && githubPersist && GITHUB_TOKEN) || (REMOTE_PERSIST_URL && remotePersist) )) return;
+      if (autoBackupHandle) return;
+      autoBackupHandle = setInterval(async () => {
+        if (isBackingUp) return;
+        try {
+          const content = JSON.stringify(DB, null, 2);
+          const hash = crypto.createHash('sha256').update(content).digest('hex');
+          if (hash === lastBackupHash) return;
+          isBackingUp = true;
+          await writeJsonFileAtomic(DATA_FILE, DB);
+          try {
+            await githubPersist.putFileToRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN, content, 'Auto backup data.json');
+            lastBackupHash = hash;
+            console.log('[AUTO-BACKUP] Backup data.json -> GitHub completed.');
+          } catch (err) {
+            console.error('[AUTO-BACKUP] Backup to GitHub failed:', err.message);
+          }
+        } catch (err) {
+          console.error('[AUTO-BACKUP] Unexpected error:', err.message);
+        } finally {
+          isBackingUp = false;
+        }
+      }, AUTO_BACKUP_INTERVAL_MS);
+    }
+
+    scheduleAutoBackup();
+
+    async function performFinalBackup() {
+      if (isBackingUp) return;
+      if (!GITHUB_PERSIST_REPO || !githubPersist || !GITHUB_TOKEN) return;
+      try {
+        isBackingUp = true;
+        const content = JSON.stringify(DB, null, 2);
+        await writeJsonFileAtomic(DATA_FILE, DB);
+        await githubPersist.putFileToRepo(GITHUB_PERSIST_REPO, GITHUB_DATA_PATH, GITHUB_PERSIST_BRANCH, GITHUB_TOKEN, content, 'Shutdown backup data.json');
+        console.log('[SHUTDOWN-BACKUP] Backup completed.');
+      } catch (err) {
+        console.error('[SHUTDOWN-BACKUP] Failed:', err.message);
+      } finally {
+        isBackingUp = false;
+      }
+    }
+
+    process.on('SIGINT', () => {
+      console.log('[SHUTDOWN] SIGINT received — attempting final backup before exit');
+      performFinalBackup().then(() => process.exit(0));
+    });
+    process.on('SIGTERM', () => {
+      console.log('[SHUTDOWN] SIGTERM received — attempting final backup before exit');
+      performFinalBackup().then(() => process.exit(0));
+    });
   } catch (error) {
     console.error('[DB] Khong the khoi dong server:', error.message);
     process.exit(1);
