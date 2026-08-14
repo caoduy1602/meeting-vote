@@ -1,24 +1,34 @@
 # Deploy to Render (quick guide)
 
-1. Push your repository to GitHub.
+## Quick Setup (Persistent Disk - Free Plan)
 
-2. On Render dashboard, create a new **Web Service** and connect your GitHub repo.
+1. **Push repository to GitHub**
 
-3. Build & Start settings:
+2. **Create Web Service on Render**:
+   - Connect your GitHub repo
    - Build Command: `npm install`
    - Start Command: `npm start`
    - Environment: `Node 18`
 
-4. Add Environment Variables in Render's dashboard:
+3. **Add Environment Variables**:
    - `ADMIN_PASSWORD` — mật khẩu admin
-   - `SESSION_SECRET` — key cho JWT
-   - `DATA_DIR=/opt/render/project/src/data`
-   - (optionally) `PORT` — Render sẽ gán port nếu không khai báo
+   - `SESSION_SECRET` — key cho JWT  
+   - `DATA_DIR` — `/opt/render/project/src/data`
+   - (optional) `PORT` — Render sẽ tự gán nếu không khai báo
 
-5. Enable a Persistent Disk on Render and mount it to:
-   - `Mount Path: /opt/render/project/src/data`
+4. **Enable Persistent Disk** (Free Plan - 0.5GB max):
+   - In Render Dashboard → Web Service → **Disk**
+   - Click **"Add Disk"**
+   - **Name**: `data-disk`
+   - **Size**: 0.5 GB (free max)
+   - **Mount Path**: `/opt/render/project/src/data`
+   - Click **"Create"** and **Redeploy**
 
-6. After deploy, open the service URL. If voter list missing, create `config/voters.json` in repo.
+5. **Verify after deployment**:
+   - Open service URL
+   - Try creating/updating data
+   - Restart service — data should persist
+   - If voter list missing, add `config/voters.json` to repo
 
 Run locally with Docker (example):
 ```

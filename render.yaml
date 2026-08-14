@@ -8,14 +8,11 @@ services:
     envVars:
       - key: DATA_DIR
         value: /opt/render/project/src/data
-      - key: DATABASE_URL
-        value: ${databases.meeting-vote-db.connectionString}
+      - key: ADMIN_PASSWORD
+        value: change-this-password
+      - key: SESSION_SECRET
+        value: change-this-secret-key
     disk:
+      name: data-disk
       mountPath: /opt/render/project/src/data
-
-databases:
-  - name: meeting-vote-db
-    engine: postgresql
-    plan: starter
-    version: "14"
-    diskSizeGb: 1
+      sizeGb: 0.5
