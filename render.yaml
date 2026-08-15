@@ -6,13 +6,17 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
-      - key: DATA_DIR
-        value: /opt/render/project/src/data
       - key: ADMIN_PASSWORD
         value: change-this-password
       - key: SESSION_SECRET
         value: change-this-secret-key
-    disk:
-      name: data-disk
-      mountPath: /opt/render/project/src/data
-      sizeGb: 0.5
+      - key: DATABASE_URL
+        value: ${databases.meeting-vote-db.connectionString}
+      - key: DATA_DIR
+        value: /tmp/meeting-vote-data
+
+databases:
+  - name: meeting-vote-db
+    engine: postgresql
+    plan: free
+    version: "16"
