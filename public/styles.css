@@ -89,7 +89,8 @@ h1.title{font-family:'Playfair Display',serif;font-weight:900;color:#EFE7D2;text
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;color:#c9d2ea;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.06em;}
 .topbar .who{color:var(--gold);}
 .link-back{color:#9fb0d6;text-decoration:none;cursor:pointer;border-bottom:1px dotted #9fb0d6;}
-.admin-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;}
+.admin-bg #app{max-width:1280px;margin:0 auto;}
+.admin-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:28px;}
 .admin-grid .card{background:rgba(255,255,255,0.88);border-color:rgba(216,206,176,0.35);box-shadow:0 18px 32px rgba(0,0,0,0.12);}
 @media (max-width:780px){.admin-grid{grid-template-columns:1fr;}}
 .display-layout{
@@ -277,14 +278,14 @@ input:focus, textarea:focus, select:focus, button:focus-visible{outline:2px soli
 .seal-result .s2{font-size:14px;}
 .history{margin-top:26px;}
 .history h3{font-family:'Playfair Display',serif;font-size:15px;color:var(--ink);margin-bottom:10px;}
-
 .vote-list-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .vote-pill{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:999px;letter-spacing:.05em;white-space:nowrap;}
 .vote-pill.yes{background:rgba(46,94,69,0.12);color:var(--green-deep);}
 .vote-pill.no{background:rgba(140,47,38,0.12);color:var(--red-deep);}
 .vote-pill.blank{background:rgba(0,0,0,0.08);color:#5b5342;}
 .vote-time{font-family:'JetBrains Mono',monospace;font-size:11px;color:#6b6250;white-space:nowrap;}
-.hist-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;gap:10px;}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line);font-size:12px;gap:8px;}
+
 .hist-row:last-child{border-bottom:none;}
 .hist-title{font-weight:600;color:var(--ink);flex:1;}
 .hist-score{font-family:'JetBrains Mono',monospace;font-size:12px;color:#6b6250;white-space:nowrap;}

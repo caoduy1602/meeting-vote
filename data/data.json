@@ -4,8 +4,30 @@
       "id": "d_msmo4hq6ityr",
       "title": "CV123",
       "content": "Test local",
+  "status": "closed",
+  "createdAt": 1786332291774,
+  "yes": 0,
+  "no": 0,
+  "blank": 0,
+  "closedAt": 1786332293356
+    },
+    {
+      "id": "d_mtll5pj12irq",
+      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
+      "content": "",
       "status": "closed",
-      "createdAt": 1786332291774,
+      "createdAt": 1788443625853,
+      "yes": 0,
+      "no": 0,
+      "blank": 0,
+      "closedAt": 1788443631716
+    },
+    {
+      "id": "d_mskkzdyf3g7e",
+      "title": "công văn số 12345/HDND ngày 02/07/2026 của UBND xã Quảng Hà",
+      "content": "sao cũng được",
+      "status": "closed",
+      "createdAt": 1786206082407,
       "yes": 0,
       "no": 0,
       "blank": 0,
@@ -13,8 +35,29 @@
     }
   ],
   "votes": {
-    "d_msmo4hq6ityr": {}
+    "d_msmo4hq6ityr": {},
+    "d_mskkzdyf3g7e": {
+      "v1": {
+        "choice": "yes",
+        "name": "Hoàng Trung Kiên",
+        "votedAt": 1786206102583
+      }
+    },
+    "d_mtll5pj12irq": {}
   },
-  "currentDocId": "d_msmo4hq6ityr",
-  "templates": []
+  "currentDocId": "d_mtll5pj12irq",
+  "templates": [
+    {
+      "id": "tpl_mtll5ga87wla",
+      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
+      "content": "",
+      "createdAt": 1788443613872
+    },
+    {
+      "id": "tpl_mskl0hoyyqbr",
+      "title": "123",
+      "content": "111111",
+      "createdAt": 1786206133906
+    }
+  ]
 }
