@@ -20,6 +20,26 @@ function formatVoteTime(ts) {
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function formatElapsedTime(startedAt, endedAt) {
+  const endTime = endedAt ? Number(endedAt) : Date.now();
+  const elapsed = Math.max(0, endTime - Number(startedAt || 0));
+  const totalSeconds = Math.floor(elapsed / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
+}
+
+function startVoteTimer(startedAt) {
+  clearInterval(window.__voteTimer);
+  const update = () => {
+    const timer = document.getElementById('vote-timer');
+    if (timer) timer.textContent = formatElapsedTime(startedAt);
+  };
+  update();
+  window.__voteTimer = setInterval(update, 1000);
+}
+
 function saveSession(s) {
   session = s;
   localStorage.setItem('meeting-vote-session', JSON.stringify(s));
@@ -89,6 +109,7 @@ function downloadBlobAsFile(blob, fallbackName) {
 // ---------------- ROLE SELECT ----------------
 function renderRoleSelect() {
   if (socket) { socket.disconnect(); socket = null; }
+  clearInterval(window.__voteTimer);
   setDisplayBg(false);
   setRoleBg(true);
   setAdminBg(false);
@@ -249,6 +270,7 @@ async function enterDisplay() {
 
 function backToRoleSelect() {
   clearInterval(window.__displayPoll);
+  clearInterval(window.__voteTimer);
   clearSession();
   setDisplayBg(false);
   setRoleBg(true);
@@ -268,6 +290,8 @@ function renderAdmin() {
   const approvalText = tally.total > 0 ? `${yesPct}%` : '0%';
   const history = latestState.history || [];
   const templates = latestState.templates || [];
+  const votedList = latestState.votedList || [];
+  const unvotedList = latestState.unvotedList || [];
 
   app.innerHTML = `
     <div class="topbar"><span>MIỀN <span class="who">QUẢN TRỊ</span></span><span class="link-back" id="back">← Đăng xuất</span></div>
@@ -318,6 +342,27 @@ function renderAdmin() {
         <div class="bar"><div class="fill" style="width:${yesPct}%"></div></div>
         <div class="total-line">TỔNG SỐ NGƯỜI THAM GIA BIỂU QUYẾT: ${tally.total}</div>
         <div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${tally.total > 0 ? `${yesPct}%` : '0%'} trên tổng số người tham gia biểu quyết</div>
+        <div class="admin-vote-lists">
+          <div class="admin-vote-list">
+            <h3><span class="admin-vote-list-title">Người đã hoàn thành tham gia biểu quyết</span><span class="vote-count">${votedList.length}</span></h3>
+            <div class="vote-list">
+              ${votedList.length ? votedList.map(item => `
+                <div class="vote-list-item">
+                  <div class="vote-list-name">${escapeHtml(item.name)}</div>
+                  <div class="vote-list-meta">
+                    <span class="vote-pill ${item.choice === 'yes' ? 'yes' : (item.choice === 'no' ? 'no' : 'blank')}">${item.choice === 'yes' ? 'Đồng ý' : (item.choice === 'no' ? 'Không đồng ý' : 'Không tham gia biểu quyết')}</span>
+                  </div>
+                </div>
+              `).join('') : '<div class="empty">Chưa có người nào tham gia.</div>'}
+            </div>
+          </div>
+          <div class="admin-vote-list">
+            <h3><span class="admin-vote-list-title">Người chưa tham gia biểu quyết</span><span class="vote-count">${unvotedList.length}</span></h3>
+            <div class="vote-list">
+              ${unvotedList.length ? unvotedList.map(item => `<div class="vote-list-item"><div class="vote-list-name">${escapeHtml(item.name)}</div></div>`).join('') : '<div class="empty">Tất cả đã tham gia.</div>'}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -392,6 +437,7 @@ function renderAdmin() {
 
 // ---------------- VOTER VIEW ----------------
 function renderVoter() {
+  clearInterval(window.__voteTimer);
   setDisplayBg(false);
   setRoleBg(false);
   setVoterBg(true);
@@ -402,6 +448,7 @@ function renderVoter() {
       <div class="topbar"><span>MIỀN <span class="who">BIỂU QUYẾT</span> · ${escapeHtml(session.name)}</span><span class="link-back" id="back">← Đăng xuất</span></div>
       <div class="voter-shell"><div class="card voter-card waiting">
         <div><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        ${doc && doc.status === 'closed' ? `<div class="vote-timer" aria-label="Thời gian biểu quyết"><span>THỜI GIAN BIỂU QUYẾT</span><strong>${formatElapsedTime(doc.startedAt || doc.createdAt, doc.closedAt)}</strong></div>` : ''}
         <p>${doc && doc.status === 'closed' ? 'Phiên biểu quyết vừa kết thúc. Đang chờ công văn tiếp theo...' : 'Đang chờ quản trị viên đưa công văn ra biểu quyết...'}</p>
       </div></div>
     `;
@@ -417,10 +464,12 @@ function renderVoter() {
       <div class="pill open" style="display:inline-block;margin-bottom:14px;">ĐANG BIỂU QUYẾT</div>
       <div class="voter-title">${escapeHtml(doc.title)}</div>
       ${doc.content ? `<div class="voter-content">${escapeHtml(doc.content)}</div>` : ''}
+      <div class="vote-timer" aria-live="polite"><span>THỜI GIAN BIỂU QUYẾT</span><strong id="vote-timer">00:00:00</strong></div>
       <div id="vote-area"></div>
     </div></div>
   `;
   document.getElementById('back').onclick = backToRoleSelect;
+  startVoteTimer(doc.startedAt || doc.createdAt);
 
   const area = document.getElementById('vote-area');
   const currentChoiceText = myVoteStatus.choice === 'yes' ? 'ĐỒNG Ý' : (myVoteStatus.choice === 'no' ? 'KHÔNG ĐỒNG Ý' : 'Không tham gia biểu quyết');
@@ -447,56 +496,31 @@ function renderVoter() {
 
 // ---------------- DISPLAY VIEW ----------------
 function renderDisplay() {
+  clearInterval(window.__voteTimer);
   const doc = latestState.currentDoc;
   const tally = latestState.tally || { yes: 0, no: 0, blank: 0, total: 0 };
-  const pct = getYesPercent(tally);
-  const votedList = latestState.votedList || [];
-  const unvotedList = latestState.unvotedList || [];
+  const percentOfParticipants = value => tally.total > 0 ? `${((value / tally.total) * 100).toFixed(2)}%` : '0.00%';
   app.innerHTML = `
     <div class="topbar"><span>MÀN HÌNH <span class="who">KẾT QUẢ</span></span><span class="link-back" id="back">← Đổi vai trò</span></div>
     <div class="display-layout">
-      <div class="card panel tally-wrap" style="padding:36px;">
+      <div class="card panel display-result-card">
         <div class="display-card-title">Biểu Quyết</div>
         <h2>${doc ? escapeHtml(doc.title) : 'Chưa có Nghị quyết nào đang biểu quyết'}</h2>
         ${doc && doc.content ? `<p class="display-doc-content">${escapeHtml(doc.content)}</p>` : ''}
         <div class="desc">${doc ? (doc.status === 'open' ? 'Đang biểu quyết' : 'Đã kết thúc') : ''}</div>
-        ${doc && doc.status === 'closed' ? `<div class="seal-result ${tally.yes > tally.no ? 'pass' : ''}"><div class="s1">KẾT QUẢ</div><div class="s2">${tally.yes > tally.no ? 'THÔNG QUA' : (tally.yes === tally.no ? 'HOÀ' : 'KHÔNG QUA')}</div></div>` : ''}
-        <div class="tally-nums">
-          <div class="tnum yes"><div class="n">${tally.yes}</div><div class="lab">Đồng ý</div></div>
-          <div class="tnum no"><div class="n">${tally.no}</div><div class="lab">Không đồng ý</div></div>
-          <div class="tnum blank"><div class="n">${tally.blank || 0}</div><div class="lab">Không tham gia biểu quyết</div></div>
+        <div class="display-result-table" aria-label="Tổng hợp kết quả biểu quyết">
+          ${doc && (doc.status === 'open' || doc.status === 'closed') ? `<div class="display-result-row timer-row"><div class="display-result-label">THỜI GIAN</div><div class="display-result-value" id="vote-timer">${formatElapsedTime(doc.startedAt || doc.createdAt, doc.closedAt)}</div></div>` : ''}
+          <div class="display-result-row participants-row"><div class="display-result-label">SỐ NGƯỜI THAM GIA</div><div class="display-result-number">${tally.total}</div></div>
+          <div class="display-result-row"><div class="display-result-label">TÁN THÀNH</div><div class="display-result-number">${tally.yes}</div><div class="display-result-percent">${percentOfParticipants(tally.yes)}</div></div>
+          <div class="display-result-row"><div class="display-result-label">KHÔNG TÁN THÀNH</div><div class="display-result-number">${tally.no}</div><div class="display-result-percent">${percentOfParticipants(tally.no)}</div></div>
+          <div class="display-result-row"><div class="display-result-label">KHÔNG BIỂU QUYẾT</div><div class="display-result-number">${tally.blank || 0}</div><div class="display-result-percent">${percentOfParticipants(tally.blank || 0)}</div></div>
         </div>
-        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-        <div class="total-line">TỔNG SỐ NGƯỜI THAM GIA BIỂU QUYẾT: ${tally.total}</div>
-        <div class="total-line" style="margin-top:8px;">TỶ LỆ ĐỒNG Ý: ${tally.total > 0 ? `${pct}%` : '0%'} trên tổng số người tham gia biểu quyết</div>
-      </div>
-      <div class="card panel vote-list-panel">
-        <h3>Danh sách người đã tham gia biểu quyết</h3>
-        <div class="vote-list">
-          ${votedList.length ? votedList.map(item => `
-            <div class="vote-list-item">
-              <div class="vote-list-name">${escapeHtml(item.name)}</div>
-              <div class="vote-list-meta">
-                <span class="vote-pill ${item.choice === 'yes' ? 'yes' : (item.choice === 'no' ? 'no' : 'blank')}">${item.choice === 'yes' ? 'Đồng ý' : (item.choice === 'no' ? 'Không đồng ý' : 'Không tham gia biểu quyết')}</span>
-                <span class="vote-time">${escapeHtml(formatVoteTime(item.votedAt))}</span>
-              </div>
-            </div>
-          `).join('') : '<div class="empty">Chưa có người nào tham gia nghị quyết.</div>'}
-        </div>
-      </div>
-      <div class="card panel vote-list-panel unvoted-panel">
-        <h3>Danh sách người chưa tham gia biểu quyết</h3>
-        <div class="vote-list">
-          ${unvotedList.length ? unvotedList.map(item => `
-            <div class="vote-list-item">
-              <div class="vote-list-name">${escapeHtml(item.name)}</div>
-            </div>
-          `).join('') : '<div class="empty">Tất cả đã tham gia nghị quyết.</div>'}
-        </div>
+        ${doc && doc.status === 'closed' ? `<div class="display-final-result">${tally.yes > tally.no ? 'THÔNG QUA' : (tally.yes === tally.no ? 'HOÀ' : 'KHÔNG QUA')}</div>` : ''}
       </div>
     </div>
   `;
   document.getElementById('back').onclick = backToRoleSelect;
+  if (doc && doc.status === 'open') startVoteTimer(doc.startedAt || doc.createdAt);
 }
 
 // ---------------- BOOTSTRAP ----------------

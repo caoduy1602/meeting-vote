@@ -478,7 +478,8 @@ io.on('connection', (socket) => {
     if (!title) return;
     const content = String(payload && payload.content || '').trim();
     const id = 'd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const doc = { id, title, content, status: 'open', createdAt: Date.now(), yes: 0, no: 0, blank: 0 };
+    const startedAt = Date.now();
+    const doc = { id, title, content, status: 'open', createdAt: startedAt, startedAt, yes: 0, no: 0, blank: 0 };
     DB.documents.unshift(doc);
     DB.votes[id] = {};
     DB.currentDocId = id;
