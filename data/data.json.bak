@@ -1,77 +1,28 @@
 {
   "documents": [
     {
-      "id": "d_mtzen2hdnq7j",
-      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
-      "content": "",
-      "status": "open",
-      "createdAt": 1789279204945,
-      "startedAt": 1789279204945,
-      "yes": 0,
-      "no": 0,
-      "blank": 0
-    },
-    {
-      "id": "d_mtze6qro70tw",
-      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
+      "id": "d_mtzggicizy0i",
+      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 1)",
       "content": "",
       "status": "closed",
-      "createdAt": 1789278443268,
-      "startedAt": 1789278443268,
-      "yes": 0,
-      "no": 0,
-      "blank": 0,
-      "closedAt": 1789278699842
-    },
-    {
-      "id": "d_mtzdyux0muw2",
-      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
-      "content": "",
-      "status": "closed",
-      "createdAt": 1789278075396,
-      "startedAt": 1789278075396,
+      "createdAt": 1789282258146,
+      "startedAt": 1789282258146,
       "yes": 1,
       "no": 0,
       "blank": 0,
-      "closedAt": 1789278239181
-    },
-    {
-      "id": "d_mtzdraaio5s7",
-      "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
-      "content": "",
-      "status": "closed",
-      "createdAt": 1789277722074,
-      "startedAt": 1789277722074,
-      "yes": 0,
-      "no": 0,
-      "blank": 0,
-      "closedAt": 1789277725794
+      "closedAt": 1789282276371
     }
   ],
   "votes": {
-    "d_mtzdraaio5s7": {},
-    "d_mtzdyux0muw2": {
+    "d_mtzggicizy0i": {
       "v1": {
         "choice": "yes",
         "name": "Hoàng Trung Kiên",
-        "votedAt": 1789278084460
-      }
-    },
-    "d_mtze6qro70tw": {},
-    "d_mtzen2hdnq7j": {
-      "v1": {
-        "choice": "yes",
-        "name": "Hoàng Trung Kiên",
-        "votedAt": 1789279208559
-      },
-      "v2": {
-        "choice": "yes",
-        "name": "Nguyễn Tiến Đức",
-        "votedAt": 1789279464676
+        "votedAt": 1789282273695
       }
     }
   },
-  "currentDocId": "d_mtzen2hdnq7j",
+  "currentDocId": "d_mtzggicizy0i",
   "templates": [
     {
       "id": "tpl_mtzf8ly4etai",
@@ -90,12 +41,6 @@
       "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
       "content": "",
       "createdAt": 1788443613872
-    },
-    {
-      "id": "tpl_mskl0hoyyqbr",
-      "title": "123",
-      "content": "111111",
-      "createdAt": 1786206133906
     }
   ]
 }

@@ -313,6 +313,7 @@ function renderAdmin() {
             ? '<button class="btn btn-primary" id="start-vote">Đưa ra biểu quyết</button>'
             : '<button class="btn btn-gold" id="close-vote">Kết thúc &amp; chốt kết quả</button>'}
           <button class="btn btn-ghost btn-small" id="export-btn">⬇ Xuất báo cáo Excel</button>
+          <button class="btn btn-danger btn-small" id="reset-all-btn">Reset màn hình chiếu</button>
         </div>
         <div class="template-box">
           <h3>Tài liệu đã nhập</h3>
@@ -433,6 +434,12 @@ function renderAdmin() {
   };
   const closeBtn = document.getElementById('close-vote');
   if (closeBtn) closeBtn.onclick = () => socket.emit('admin:closeDoc');
+  const resetAllBtn = document.getElementById('reset-all-btn');
+  if (resetAllBtn) resetAllBtn.onclick = () => {
+    if (!confirm('Bạn có chắc muốn ẩn công văn và kết quả trên màn hình chiếu? Lịch sử nghị quyết sẽ được giữ nguyên.')) return;
+    resetAllBtn.disabled = true;
+    socket.emit('admin:resetAll');
+  };
 }
 
 // ---------------- VOTER VIEW ----------------

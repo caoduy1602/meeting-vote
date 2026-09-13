@@ -502,6 +502,14 @@ io.on('connection', (socket) => {
     io.emit('state', publicState());
   });
 
+  // ----- Admin: reset màn hình chiếu, giữ nguyên lịch sử -----
+  socket.on('admin:resetAll', async () => {
+    if (socket.data.user.role !== 'admin') return;
+    DB.currentDocId = null;
+    await saveData(DB);
+    io.emit('state', publicState());
+  });
+
   // ----- Admin: lưu tài liệu mẫu cho lần biểu quyết sau -----
   socket.on('admin:saveTemplate', async (payload) => {
     if (socket.data.user.role !== 'admin') return;
