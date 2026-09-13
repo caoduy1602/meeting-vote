@@ -4,12 +4,13 @@
       "id": "d_mtzen2hdnq7j",
       "title": "Dự thảo Nghị Quyết về việc điều chỉnh, bổ sung danh mục dự án, phân bổ nguồn vốn kế hoạch đầu tư công xã Quảng Hà năm 2026 (lần 3)",
       "content": "",
-      "status": "open",
+      "status": "closed",
       "createdAt": 1789279204945,
       "startedAt": 1789279204945,
-      "yes": 0,
+      "yes": 2,
       "no": 0,
-      "blank": 0
+      "blank": 0,
+      "closedAt": 1789280461665
     },
     {
       "id": "d_mtze6qro70tw",
