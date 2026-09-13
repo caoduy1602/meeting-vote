@@ -2,14 +2,16 @@ services:
   - type: web
     name: meeting-vote
     env: node
-    plan: free
+    plan: starter
     buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: DATA_DIR
         value: /opt/render/project/src/data
       - key: DATABASE_URL
-        value: ${databases.meeting-vote-db.connectionString}
+        fromDatabase:
+          name: meeting-vote-db
+          property: connectionString
     disk:
       mountPath: /opt/render/project/src/data
 

@@ -295,7 +295,10 @@ function publicState() {
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  etag: true
+}));
 
 function signToken(payload) {
   return jwt.sign(payload, SESSION_SECRET, { expiresIn: '12h' });
