@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = getAdminPassword(process.env);
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-please';
 const DATABASE_URL = process.env.DATABASE_URL || null;
+const USE_POSTGRES = process.env.USE_POSTGRES === 'true';
 
 const DEFAULT_DATA_DIR = path.join(__dirname, 'data');
 const DEFAULT_RENDER_DATA_DIR = path.resolve('/opt/render/project/src/data');
@@ -84,7 +85,7 @@ function normalizeState(data) {
 }
 
 function usePostgresql() {
-  return Boolean(DATABASE_URL);
+  return USE_POSTGRES && Boolean(DATABASE_URL);
 }
 
 function ensureDbConfigured() {
