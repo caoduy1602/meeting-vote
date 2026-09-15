@@ -517,7 +517,7 @@ function renderDisplay() {
         <div class="desc">${doc ? (doc.status === 'open' ? 'Đang biểu quyết' : 'Đã kết thúc') : ''}</div>
         <div class="display-result-table" aria-label="Tổng hợp kết quả biểu quyết">
           <div class="display-result-row display-result-header-row"><div class="display-result-label display-result-header-label">KẾT QUẢ BIỂU QUYẾT</div></div>
-          ${doc && (doc.status === 'open' || doc.status === 'closed') ? `<div class="display-result-row timer-row"><div class="display-result-label">THỜI GIAN</div><div class="display-result-value" id="vote-timer">${formatElapsedTime(doc.startedAt || doc.createdAt, doc.closedAt)}</div></div>` : ''}
+          <div class="display-result-row timer-row"><div class="display-result-label">THỜI GIAN</div><div class="display-result-value" id="vote-timer">${doc ? formatElapsedTime(doc.startedAt || doc.createdAt, doc.closedAt) : '00:00:00'}</div></div>
           <div class="display-result-row participants-row"><div class="display-result-label">SỐ NGƯỜI THAM GIA</div><div class="display-result-number">${tally.total}</div></div>
           <div class="display-result-row"><div class="display-result-label">TÁN THÀNH</div><div class="display-result-number">${tally.yes}</div><div class="display-result-percent">${percentOfParticipants(tally.yes)}</div></div>
           <div class="display-result-row"><div class="display-result-label">KHÔNG TÁN THÀNH</div><div class="display-result-number">${tally.no}</div><div class="display-result-percent">${percentOfParticipants(tally.no)}</div></div>
