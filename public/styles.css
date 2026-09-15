@@ -165,6 +165,8 @@ h1.title{font-family:'Playfair Display',serif;font-weight:900;color:#EFE7D2;text
 .display-result-table{margin-top:20px;border:2px solid #1d477f;background:#073b82;color:#fff;}
 .display-result-row{display:grid;grid-template-columns:2fr 1fr 1fr;align-items:center;min-height:74px;border-bottom:2px solid rgba(255,255,255,.9);}
 .display-result-row:last-child{border-bottom:none;}
+.display-result-header-row{grid-template-columns:1fr;background:linear-gradient(180deg,#21d34a 0%,#1cb64a 100%);border-bottom:3px solid rgba(255,215,102,.9);min-height:82px;}
+.display-result-header-label{display:flex;align-items:center;justify-content:center;font-family:'Lora',serif;font-size:clamp(23px,3vw,44px);letter-spacing:.08em;text-transform:uppercase;color:#fff;text-align:center;font-weight:700;padding:18px 12px;}
 .participants-row{grid-template-columns:2fr 2fr;}
 .display-result-label,.display-result-number,.display-result-percent{padding:14px 22px;}
 .display-result-label{font-family:'Lora',serif;font-size:clamp(17px,2.2vw,28px);letter-spacing:.03em;}
