@@ -12,7 +12,7 @@ services:
         value: "true"
       - key: DATABASE_URL
         fromDatabase:
-          name: meeting-vote-db
+          name: meeting-vote-db-v2
           property: connectionString
     disk:
       name: meeting-vote-data
@@ -20,7 +20,7 @@ services:
       sizeGB: 1
 
 databases:
-  - name: meeting-vote-db
+  - name: meeting-vote-db-v2
     plan: 0.1c-256mb
     postgresMajorVersion: "14"
     diskSizeGB: 1

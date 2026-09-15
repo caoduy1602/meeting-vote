@@ -15,6 +15,7 @@ const ADMIN_PASSWORD = getAdminPassword(process.env);
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-please';
 const DATABASE_URL = process.env.DATABASE_URL || null;
 const USE_POSTGRES = process.env.USE_POSTGRES === 'true';
+let runtimeUsePostgres = USE_POSTGRES && Boolean(DATABASE_URL);
 
 const DEFAULT_DATA_DIR = path.join(__dirname, 'data');
 const DEFAULT_RENDER_DATA_DIR = path.resolve('/opt/render/project/src/data');
@@ -85,7 +86,13 @@ function normalizeState(data) {
 }
 
 function usePostgresql() {
-  return USE_POSTGRES && Boolean(DATABASE_URL);
+  return runtimeUsePostgres;
+}
+
+function disablePostgresFallback() {
+  runtimeUsePostgres = false;
+  pool = null;
+  console.warn('[DB] PostgreSQL khong san sang, chuyen sang fallback data.json.');
 }
 
 function ensureDbConfigured() {
@@ -109,19 +116,27 @@ async function initializeDatabase() {
     await pool.query('SELECT 1');
   } catch (err) {
     console.error('[DB] Khong the ket noi PostgreSQL:', err.message);
-    throw err;
+    disablePostgresFallback();
+    ensureDirectoryExists(DATA_DIR);
+    return;
   }
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS meeting_vote_state (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      documents JSONB NOT NULL DEFAULT '[]'::jsonb,
-      votes JSONB NOT NULL DEFAULT '{}'::jsonb,
-      current_doc_id TEXT,
-      templates JSONB NOT NULL DEFAULT '[]'::jsonb,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meeting_vote_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        documents JSONB NOT NULL DEFAULT '[]'::jsonb,
+        votes JSONB NOT NULL DEFAULT '{}'::jsonb,
+        current_doc_id TEXT,
+        templates JSONB NOT NULL DEFAULT '[]'::jsonb,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (err) {
+    console.error('[DB] Khong the khoi tao PostgreSQL schema:', err.message);
+    disablePostgresFallback();
+    ensureDirectoryExists(DATA_DIR);
+  }
 }
 
 async function loadData() {
@@ -588,19 +603,30 @@ async function startServer() {
     DB = await loadData();
     server.listen(PORT, () => {
       console.log(`Meeting-vote server dang chay tai http://localhost:${PORT}`);
-    console.log(`[DATA] Su dung DATA_DIR: ${DATA_DIR}`);
-    if (usePostgresql()) {
-      console.log('[DB] Dang su dung PostgreSQL.');
-    } else {
-      console.log('[DB] Chua co DATABASE_URL, dang su dung fallback data.json cho local development.');
-    }
-    if (VOTERS.length === 0) {
-      console.log('>> Hay tao file config/voters.json (copy tu voters.example.json) truoc khi dung that.');
-    }
-  });
+      console.log(`[DATA] Su dung DATA_DIR: ${DATA_DIR}`);
+      if (usePostgresql()) {
+        console.log('[DB] Dang su dung PostgreSQL.');
+      } else {
+        console.log('[DB] Chua co DATABASE_URL hoac PostgreSQL khong san sang, dang su dung fallback data.json.');
+      }
+      if (VOTERS.length === 0) {
+        console.log('>> Hay tao file config/voters.json (copy tu voters.example.json) truoc khi dung that.');
+      }
+    });
   } catch (error) {
     console.error('[DB] Khong the khoi dong server:', error.message);
-    process.exit(1);
+    console.error('[DB] Dang khoi dong server theo fallback local data.json...');
+    try {
+      DB = await loadData();
+      server.listen(PORT, () => {
+        console.log(`Meeting-vote server dang chay tai http://localhost:${PORT}`);
+        console.log(`[DATA] Su dung DATA_DIR: ${DATA_DIR}`);
+        console.log('[DB] Da chuyen sang fallback data.json do Postgres khong san sang.');
+      });
+    } catch (fallbackError) {
+      console.error('[DB] Khong the khoi dong server duoi fallback:', fallbackError.message);
+      process.exit(1);
+    }
   }
 }
 
