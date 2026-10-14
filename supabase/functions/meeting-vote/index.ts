@@ -2,14 +2,14 @@ import postgres from 'npm:postgres@3.4.7';
 import ExcelJS from 'npm:exceljs@4.4.0';
 
 const encoder = new TextEncoder();
-const databaseUrl = Deno.env.get('APP_DB_URL') || Deno.env.get('SUPABASE_DB_URL') || '';
+const databaseUrl = Deno.env.get('APP_DB_URL') || '';
 const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 const publishableKeys = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '{}');
 const publishableKey = publishableKeys.default || Deno.env.get('SUPABASE_ANON_KEY') || '';
 const secretKeys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}');
 const adminPassword = Deno.env.get('ADMIN_PASSWORD') || '';
 const sessionSecret = secretKeys.default || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const database = databaseUrl ? postgres(databaseUrl, { max: 1 }) : null;
+const database = databaseUrl ? postgres(databaseUrl, { max: 1, prepare: false }) : null;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -206,7 +206,7 @@ function voterStatus(state: ReturnType<typeof normalizeState>, voterId: string) 
 }
 
 async function withConnection<T>(callback: (connection: any) => Promise<T>): Promise<T> {
-  if (!database) throw new HttpError(503, 'Chưa cấu hình SUPABASE_DB_URL');
+  if (!database) throw new HttpError(503, 'Chưa cấu hình APP_DB_URL bằng Supabase Transaction Pooler');
   const connection = {
     queryObject(strings: TemplateStringsArray, ...values: unknown[]) {
       const query = strings.reduce((result, part, index) => `${result}${index ? `$${index}` : ''}${part}`, '');

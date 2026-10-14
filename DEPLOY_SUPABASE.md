@@ -25,9 +25,13 @@ bằng workflow trong `.github/workflows/deploy-pages.yml`.
    Copy-Item .env.supabase-function.example .env.supabase-function
    ```
    Điền URL, publishable key, secret key và Session Pooler URI lấy từ
-   Supabase **Connect**. Dùng URI có `sslmode=require`. Đặt `ADMIN_PASSWORD`
-   mạnh, ngẫu nhiên. File thật bị Git ignore. Function dùng secret key Supabase
-   tự inject làm khóa ký phiên.
+   Supabase **Connect** trong `.env.supabase`. Dùng URI có `sslmode=require`.
+   Trong `.env.supabase-function`, đặt `ADMIN_PASSWORD` mạnh, ngẫu nhiên và
+   `APP_DB_URL` là **Transaction Pooler** URI từ Supabase **Connect** (port
+   `6543`, không dùng Session Pooler port `5432`). Function chạy trên nhiều
+   instance; Transaction Pooler tránh cạn giới hạn kết nối Session Pooler.
+   File thật bị Git ignore. Function dùng secret key Supabase tự inject làm
+   khóa ký phiên.
    Trước khi dùng project, hãy reset database password trong Supabase và cập
    nhật URI mới vào các file env; password được generate trong phiên tạo project
    không nên dùng lại.
@@ -46,7 +50,9 @@ Importer chỉ chép state khi bảng còn trống; voter PIN được lưu dư�
 hash có salt riêng. Nếu cần ghi đè state có sẵn, đặt `FORCE_IMPORT_STATE=true` trong
 `.env.supabase` và chạy import có chủ đích.
 
-Đẩy secrets riêng cho Edge Function rồi deploy:
+Đẩy secrets riêng cho Edge Function rồi deploy. `APP_DB_URL` phải trỏ tới
+Supabase Transaction Pooler (port `6543`); Function tắt prepared statements
+để tương thích với chế độ pooling này:
 
 ```powershell
 npx supabase secrets set --env-file .env.supabase-function --project-ref aqfugvogxelcfqwqbkut
