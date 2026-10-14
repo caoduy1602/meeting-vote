@@ -5,6 +5,9 @@ const supabaseClient = supabaseConfig && window.supabase
   : null;
 let socket = null;
 let realtimeChannel = null;
+let supabaseStatePoll = null;
+let supabaseRefreshPromise = null;
+let supabaseMutationVersion = 0;
 let session = null; // { token, role, name, id }
 let latestState = { currentDoc: null, tally: { yes: 0, no: 0, blank: 0, total: 0 }, history: [] };
 let myVoteStatus = { docId: null, voted: false, choice: null };
@@ -70,20 +73,33 @@ function expireSupabaseSession() {
 }
 
 async function refreshSupabaseState() {
-  try {
-    const response = await apiFetch('/api/state');
-    if (!response.ok) throw new Error('Không tải được trạng thái biểu quyết');
-    latestState = await response.json();
-    if (session && session.role === 'voter') {
-      const statusResponse = await apiFetch('/api/voter/status', {
-        headers: { Authorization: 'Bearer ' + session.token }
-      });
-      if (statusResponse.status === 401) return expireSupabaseSession();
-      if (statusResponse.ok) myVoteStatus = await statusResponse.json();
+  if (supabaseRefreshPromise) return supabaseRefreshPromise;
+  supabaseRefreshPromise = (async () => {
+    const mutationVersion = supabaseMutationVersion;
+    try {
+      const response = await apiFetch('/api/state');
+      if (!response.ok) throw new Error('Không tải được trạng thái biểu quyết');
+      const state = await response.json();
+      if (session && session.role === 'voter') {
+        const statusResponse = await apiFetch('/api/voter/status', {
+          headers: { Authorization: 'Bearer ' + session.token }
+        });
+        if (statusResponse.status === 401) return expireSupabaseSession();
+        if (!statusResponse.ok) throw new Error('Không tải được trạng thái phiếu biểu quyết');
+        const voterStatus = await statusResponse.json();
+        if (mutationVersion === supabaseMutationVersion) myVoteStatus = voterStatus;
+      }
+      if (mutationVersion !== supabaseMutationVersion) return;
+      latestState = state;
+      rerenderCurrentView();
+    } catch (error) {
+      console.error('Không tải được trạng thái Supabase:', error);
     }
-    rerenderCurrentView();
-  } catch (error) {
-    console.error('Không tải được trạng thái Supabase:', error);
+  })();
+  try {
+    await supabaseRefreshPromise;
+  } finally {
+    supabaseRefreshPromise = null;
   }
 }
 
@@ -105,6 +121,7 @@ async function runAction(socketEvent, apiPath, payload = {}) {
     const result = await response.json();
     if (response.status === 401) return expireSupabaseSession();
     if (!response.ok) throw new Error(result.error || 'Không thể cập nhật dữ liệu');
+    supabaseMutationVersion += 1;
     if (result.state) latestState = result.state;
     if (result.voterStatus) myVoteStatus = result.voterStatus;
     rerenderCurrentView();
@@ -116,6 +133,8 @@ async function runAction(socketEvent, apiPath, payload = {}) {
 function connectSocket() {
   if (socket) socket.disconnect();
   if (supabaseClient) {
+    clearInterval(supabaseStatePoll);
+    supabaseStatePoll = setInterval(() => void refreshSupabaseState(), 5000);
     if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = supabaseClient
       .channel('meeting-vote-state')
@@ -184,6 +203,8 @@ function downloadBlobAsFile(blob, fallbackName) {
 // ---------------- ROLE SELECT ----------------
 function renderRoleSelect() {
   if (socket) { socket.disconnect(); socket = null; }
+  clearInterval(supabaseStatePoll);
+  supabaseStatePoll = null;
   if (realtimeChannel && supabaseClient) {
     supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = null;
@@ -510,8 +531,6 @@ function renderAdmin() {
     const content = document.getElementById('template-content').value.trim();
     if (!title) return alert('Vui lòng nhập tiêu đề tài liệu trước khi lưu.');
     void runAction('admin:saveTemplate', '/api/admin/save-template', { title, content });
-    document.getElementById('template-title').value = '';
-    document.getElementById('template-content').value = '';
   };
   const startBtn = document.getElementById('start-vote');
   if (startBtn) startBtn.onclick = () => {
