@@ -1,8 +1,20 @@
 const app = document.getElementById('app');
+const supabaseConfig = window.MEETING_VOTE_CONFIG || null;
+const supabaseClient = supabaseConfig && window.supabase
+  ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
+  : null;
 let socket = null;
+let realtimeChannel = null;
 let session = null; // { token, role, name, id }
 let latestState = { currentDoc: null, tally: { yes: 0, no: 0, blank: 0, total: 0 }, history: [] };
 let myVoteStatus = { docId: null, voted: false, choice: null };
+
+function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (supabaseConfig) headers.set('apikey', supabaseConfig.publishableKey);
+  const url = supabaseConfig ? `${supabaseConfig.functionUrl}${path}` : path;
+  return fetch(url, { ...options, headers });
+}
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -52,8 +64,75 @@ function clearSession() {
   localStorage.removeItem('meeting-vote-session');
 }
 
+function expireSupabaseSession() {
+  clearSession();
+  renderRoleSelect();
+}
+
+async function refreshSupabaseState() {
+  try {
+    const response = await apiFetch('/api/state');
+    if (!response.ok) throw new Error('Không tải được trạng thái biểu quyết');
+    latestState = await response.json();
+    if (session && session.role === 'voter') {
+      const statusResponse = await apiFetch('/api/voter/status', {
+        headers: { Authorization: 'Bearer ' + session.token }
+      });
+      if (statusResponse.status === 401) return expireSupabaseSession();
+      if (statusResponse.ok) myVoteStatus = await statusResponse.json();
+    }
+    rerenderCurrentView();
+  } catch (error) {
+    console.error('Không tải được trạng thái Supabase:', error);
+  }
+}
+
+async function runAction(socketEvent, apiPath, payload = {}) {
+  if (!supabaseClient) {
+    if (socket) socket.emit(socketEvent, payload);
+    return;
+  }
+
+  try {
+    const response = await apiFetch(apiPath, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session && session.token ? { Authorization: 'Bearer ' + session.token } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (response.status === 401) return expireSupabaseSession();
+    if (!response.ok) throw new Error(result.error || 'Không thể cập nhật dữ liệu');
+    if (result.state) latestState = result.state;
+    if (result.voterStatus) myVoteStatus = result.voterStatus;
+    rerenderCurrentView();
+  } catch (error) {
+    alert(error.message || 'Không thể kết nối Supabase');
+  }
+}
+
 function connectSocket() {
   if (socket) socket.disconnect();
+  if (supabaseClient) {
+    if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
+    realtimeChannel = supabaseClient
+      .channel('meeting-vote-state')
+      .on('broadcast', { event: 'state' }, ({ payload }) => {
+        latestState = payload.state || payload;
+        if (session && session.role === 'voter') {
+          void refreshSupabaseState();
+        } else {
+          rerenderCurrentView();
+        }
+      })
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') void refreshSupabaseState();
+      });
+    return;
+  }
+
   socket = io({ auth: { token: session.token } });
   socket.on('connect_error', () => {
     clearSession();
@@ -109,11 +188,16 @@ function downloadBlobAsFile(blob, fallbackName) {
 // ---------------- ROLE SELECT ----------------
 function renderRoleSelect() {
   if (socket) { socket.disconnect(); socket = null; }
+  if (realtimeChannel && supabaseClient) {
+    supabaseClient.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
   clearInterval(window.__voteTimer);
   setDisplayBg(false);
   setRoleBg(true);
   setAdminBg(false);
   setVoterBg(false);
+    const realtimeName = supabaseClient ? 'Supabase Realtime' : 'WebSocket';
   app.innerHTML = `
     <h1 class="title">Biểu quyết Nghị Quyết</h1>
     <div class="card role-card">
@@ -126,7 +210,7 @@ function renderRoleSelect() {
         <button class="btn btn-display" id="btn-display">Màn hình kết quả (chiếu)</button>
       </div>
     </div>
-    <div class="footer-note">Kết nối realtime qua WebSocket · dữ liệu lưu trên server riêng</div>
+      <div class="footer-note">Kết nối realtime qua ${realtimeName} · dữ liệu lưu trên server riêng</div>
   `;
   document.getElementById('btn-admin').onclick = renderAdminLogin;
   document.getElementById('btn-voter').onclick = renderVoterLogin;
@@ -178,7 +262,7 @@ function renderAdminLogin() {
     const password = document.getElementById('admin-pass').value;
     const errEl = document.getElementById('admin-err');
     try {
-      const r = await fetch('/api/login/admin', {
+      const r = await apiFetch('/api/login/admin', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })
       });
@@ -219,7 +303,7 @@ async function renderVoterLogin() {
   const errEl = document.getElementById('voter-err');
 
   try {
-    const r = await fetch('/api/voters');
+    const r = await apiFetch('/api/voters');
     const voters = await r.json();
     if (!r.ok) throw new Error('load-voters-failed');
     selectEl.innerHTML = '<option value="">-- Chọn tên --</option>' + voters.map(v => `<option value="${escapeHtml(v.name)}">${escapeHtml(v.name)}</option>`).join('');
@@ -234,7 +318,7 @@ async function renderVoterLogin() {
     if (!voterName) { errEl.textContent = 'Vui lòng chọn tên của bạn'; return; }
     if (!pin) { errEl.textContent = 'Vui lòng nhập mã PIN'; return; }
     try {
-      const r = await fetch('/api/login/voter', {
+      const r = await apiFetch('/api/login/voter', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: voterName, pin })
       });
@@ -250,13 +334,17 @@ async function renderVoterLogin() {
 // ---------------- DISPLAY (không cần đăng nhập, chỉ xem) ----------------
 async function enterDisplay() {
   try {
-    const r = await fetch('/api/state');
+    const r = await apiFetch('/api/state');
     latestState = await r.json();
   } catch (e) {}
   session = { role: 'display', name: 'Màn hình' };
   socket = null;
   setDisplayBg(true);
   renderDisplay();
+  if (supabaseClient) {
+    connectSocket();
+    return;
+  }
   // dùng polling nhẹ cho màn hình chiếu vì không cần đăng nhập / token
   clearInterval(window.__displayPoll);
   window.__displayPoll = setInterval(async () => {
@@ -271,6 +359,10 @@ async function enterDisplay() {
 function backToRoleSelect() {
   clearInterval(window.__displayPoll);
   clearInterval(window.__voteTimer);
+  if (realtimeChannel && supabaseClient) {
+    supabaseClient.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
   clearSession();
   setDisplayBg(false);
   setRoleBg(true);
@@ -299,7 +391,7 @@ function renderAdmin() {
     <div class="admin-grid">
       <div class="card panel">
         <h2>Công văn hiện tại</h2>
-        <div class="desc">Nhập nội dung công văn và bấm "Đưa ra biểu quyết" — mọi người tham dự sẽ thấy ngay lập tức qua WebSocket.</div>
+          <div class="desc">Nhập nội dung công văn và bấm "Đưa ra biểu quyết" — mọi người tham dự sẽ thấy ngay lập tức qua ${supabaseClient ? 'Supabase Realtime' : 'WebSocket'}.</div>
         <label>Tiêu đề công văn</label>
         <input type="text" id="doc-title" placeholder="Ví dụ: Công văn số 12/CV-2026 về..." ${doc && doc.status === 'open' ? 'disabled' : ''} value="${doc && doc.status === 'open' ? escapeHtml(doc.title) : ''}">
         <label>Nội dung tóm tắt (tuỳ chọn)</label>
@@ -372,7 +464,7 @@ function renderAdmin() {
     const exportBtn = document.getElementById('export-btn');
     if (exportBtn) exportBtn.disabled = true;
     try {
-      const r = await fetch('/api/export', {
+      const r = await apiFetch('/api/export', {
         headers: { Authorization: 'Bearer ' + session.token },
         cache: 'no-store'
       });
@@ -396,7 +488,7 @@ function renderAdmin() {
     btn.onclick = () => {
       const docId = btn.getAttribute('data-doc-id');
       if (!docId || !confirm('Bạn có chắc muốn xóa công văn này khỏi lịch sử?')) return;
-      socket.emit('admin:deleteHistoryItem', { docId });
+      void runAction('admin:deleteHistoryItem', '/api/admin/delete-history', { docId });
     };
   });
   document.querySelectorAll('.use-template').forEach(btn => {
@@ -413,7 +505,7 @@ function renderAdmin() {
     btn.onclick = () => {
       const templateId = btn.getAttribute('data-template-id');
       if (!templateId || !confirm('Bạn có chắc muốn xóa tài liệu đã lưu này?')) return;
-      socket.emit('admin:deleteTemplate', { templateId });
+      void runAction('admin:deleteTemplate', '/api/admin/delete-template', { templateId });
     };
   });
   const saveTemplateBtn = document.getElementById('save-template-btn');
@@ -421,7 +513,7 @@ function renderAdmin() {
     const title = document.getElementById('template-title').value.trim();
     const content = document.getElementById('template-content').value.trim();
     if (!title) return alert('Vui lòng nhập tiêu đề tài liệu trước khi lưu.');
-    socket.emit('admin:saveTemplate', { title, content });
+    void runAction('admin:saveTemplate', '/api/admin/save-template', { title, content });
     document.getElementById('template-title').value = '';
     document.getElementById('template-content').value = '';
   };
@@ -430,15 +522,15 @@ function renderAdmin() {
     const title = document.getElementById('doc-title').value.trim();
     if (!title) return;
     const content = document.getElementById('doc-content').value.trim();
-    socket.emit('admin:createDoc', { title, content });
+    void runAction('admin:createDoc', '/api/admin/create-doc', { title, content });
   };
   const closeBtn = document.getElementById('close-vote');
-  if (closeBtn) closeBtn.onclick = () => socket.emit('admin:closeDoc');
+  if (closeBtn) closeBtn.onclick = () => runAction('admin:closeDoc', '/api/admin/close-doc');
   const resetAllBtn = document.getElementById('reset-all-btn');
   if (resetAllBtn) resetAllBtn.onclick = () => {
     if (!confirm('Bạn có chắc muốn ẩn công văn và kết quả trên màn hình chiếu? Lịch sử nghị quyết sẽ được giữ nguyên.')) return;
     resetAllBtn.disabled = true;
-    socket.emit('admin:resetAll');
+    void runAction('admin:resetAll', '/api/admin/reset');
   };
 }
 
@@ -496,9 +588,9 @@ function renderVoter() {
       <button class="vote-btn blank" id="v-blank">○ Không tham gia nghị quyết</button>
     </div>
   `;
-  document.getElementById('v-yes').onclick = () => socket.emit('voter:vote', { choice: 'yes' });
-  document.getElementById('v-no').onclick = () => socket.emit('voter:vote', { choice: 'no' });
-  document.getElementById('v-blank').onclick = () => socket.emit('voter:vote', { choice: 'blank' });
+  document.getElementById('v-yes').onclick = () => runAction('voter:vote', '/api/voter/vote', { choice: 'yes' });
+  document.getElementById('v-no').onclick = () => runAction('voter:vote', '/api/voter/vote', { choice: 'no' });
+  document.getElementById('v-blank').onclick = () => runAction('voter:vote', '/api/voter/vote', { choice: 'blank' });
 }
 
 // ---------------- DISPLAY VIEW ----------------

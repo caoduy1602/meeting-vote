@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "supabase:db:push": "npx supabase db push",
+    "supabase:function:deploy": "npx supabase functions deploy meeting-vote --no-verify-jwt",
+    "supabase:import": "node scripts/import_supabase_data.js",
+    "supabase:assets": "node scripts/deploy_supabase_assets.js"
   },
   "dependencies": {
     "axios": "^1.19.0",

@@ -28,7 +28,7 @@ body{
 }
 
 .admin-bg {
-  background: url('/assets/admin-bg.png') center/cover no-repeat fixed !important;
+  background: url('./assets/admin-bg.png') center/cover no-repeat fixed !important;
   color: #efece6;
   padding-top: 120px;
 }
@@ -37,7 +37,7 @@ body{
 .admin-bg .card::before { border-color: rgba(255,255,255,0.22); }
 
 .role-bg {
-  background: url('/assets/background-outside.png') center/cover no-repeat fixed !important;
+  background: url('./assets/background-outside.png') center/cover no-repeat fixed !important;
   color: #efece6;
   padding-top: 120px;
 }
@@ -46,7 +46,7 @@ body{
 .role-bg .card::before { border-color: rgba(255,255,255,0.14); }
 
 .voter-bg {
-  background: url('/assets/background-voter.png') center/cover no-repeat fixed !important;
+  background: url('./assets/background-voter.png') center/cover no-repeat fixed !important;
   color: #efece6;
   padding-top: 120px;
 }
@@ -57,7 +57,7 @@ body{
 /* When showing the projection/display view we apply a full-bleed background image.
    Place the provided image at `public/assets/display-bg.jpg`. */
 .display-bg {
-  background: url('/assets/display-bg.jpg') center/cover no-repeat fixed !important;
+  background: url('./assets/display-bg.jpg') center/cover no-repeat fixed !important;
   color: #efece6; /* ensure readable text on image */
 }
 .display-bg .card { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.08); }

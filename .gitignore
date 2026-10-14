@@ -6,3 +6,6 @@ npm-debug.log
 dist/
 .vercel
 .env*
+supabase/.temp/
+!.env.supabase.example
+!.env.supabase-function.example

@@ -1,0 +1,4 @@
+project_id = "meeting-vote"
+
+[functions.meeting-vote]
+verify_jwt = false

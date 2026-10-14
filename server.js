@@ -18,9 +18,8 @@ const USE_POSTGRES = process.env.USE_POSTGRES === 'true';
 let runtimeUsePostgres = USE_POSTGRES && Boolean(DATABASE_URL);
 
 const DEFAULT_DATA_DIR = path.join(__dirname, 'data');
-const DEFAULT_RENDER_DATA_DIR = path.resolve('/opt/render/project/src/data');
 const REQUESTED_DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : null;
-const DATA_DIR = REQUESTED_DATA_DIR || (fs.existsSync(DEFAULT_RENDER_DATA_DIR) ? DEFAULT_RENDER_DATA_DIR : DEFAULT_DATA_DIR);
+const DATA_DIR = REQUESTED_DATA_DIR || DEFAULT_DATA_DIR;
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const LEGACY_DATA_FILE = path.join(__dirname, 'data', 'data.json');
 const VOTERS_FILE = process.env.VOTERS_FILE
