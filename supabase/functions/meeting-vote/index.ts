@@ -2,7 +2,7 @@ import postgres from 'npm:postgres@3.4.7';
 import ExcelJS from 'npm:exceljs@4.4.0';
 
 const encoder = new TextEncoder();
-const databaseUrl = Deno.env.get('SUPABASE_DB_URL') || '';
+const databaseUrl = Deno.env.get('APP_DB_URL') || Deno.env.get('SUPABASE_DB_URL') || '';
 const supabaseUrl = (Deno.env.get('SUPABASE_URL') || '').replace(/\/$/, '');
 const publishableKeys = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') || '{}');
 const publishableKey = publishableKeys.default || Deno.env.get('SUPABASE_ANON_KEY') || '';
