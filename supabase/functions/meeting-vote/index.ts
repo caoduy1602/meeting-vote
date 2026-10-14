@@ -114,12 +114,26 @@ function normalizeVoterName(name: unknown) {
   return String(name || '').trim().toLocaleLowerCase('vi');
 }
 
+function decodeJsonValue(value: unknown) {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 function normalizeState(data: Record<string, unknown> = {}) {
+  const documents = decodeJsonValue(data.documents);
+  const votes = decodeJsonValue(data.votes);
+  const templates = decodeJsonValue(data.templates);
   return {
-    documents: Array.isArray(data.documents) ? data.documents : [],
-    votes: data.votes && typeof data.votes === 'object' ? data.votes as Record<string, Record<string, unknown>> : {},
+    documents: Array.isArray(documents) ? documents : [],
+    votes: votes && typeof votes === 'object' && !Array.isArray(votes)
+      ? votes as Record<string, Record<string, unknown>>
+      : {},
     currentDocId: typeof data.current_doc_id === 'string' ? data.current_doc_id : (data.currentDocId ?? null),
-    templates: Array.isArray(data.templates) ? data.templates : []
+    templates: Array.isArray(templates) ? templates : []
   };
 }
 
@@ -397,10 +411,22 @@ async function mutate(action: string, payload: Record<string, unknown>, user: Re
       const extra = applyMutation(state, action, payload, user, voters);
       const update = await connection.queryObject`
         UPDATE public.meeting_vote_state
-        SET documents = ${JSON.stringify(state.documents)}::jsonb,
-            votes = ${JSON.stringify(state.votes)}::jsonb,
+        SET documents = CASE
+              WHEN jsonb_typeof(${JSON.stringify(state.documents)}::jsonb) = 'string'
+                THEN (${JSON.stringify(state.documents)}::jsonb #>> '{}')::jsonb
+              ELSE ${JSON.stringify(state.documents)}::jsonb
+            END,
+            votes = CASE
+              WHEN jsonb_typeof(${JSON.stringify(state.votes)}::jsonb) = 'string'
+                THEN (${JSON.stringify(state.votes)}::jsonb #>> '{}')::jsonb
+              ELSE ${JSON.stringify(state.votes)}::jsonb
+            END,
             current_doc_id = ${state.currentDocId},
-            templates = ${JSON.stringify(state.templates)}::jsonb,
+            templates = CASE
+              WHEN jsonb_typeof(${JSON.stringify(state.templates)}::jsonb) = 'string'
+                THEN (${JSON.stringify(state.templates)}::jsonb #>> '{}')::jsonb
+              ELSE ${JSON.stringify(state.templates)}::jsonb
+            END,
             version = version + 1,
             updated_at = NOW()
         WHERE id = 1 AND version = ${version}
