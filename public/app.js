@@ -104,8 +104,12 @@ async function refreshSupabaseState() {
 }
 
 async function runAction(socketEvent, apiPath, payload = {}) {
-  if (!supabaseClient) {
-    if (socket) socket.emit(socketEvent, payload);
+  if (!supabaseConfig) {
+    if (socket && socket.connected) {
+      socket.emit(socketEvent, payload);
+    } else {
+      alert('Không kết nối được máy chủ biểu quyết. Vui lòng tải lại trang và thử lại.');
+    }
     return;
   }
 
@@ -132,9 +136,13 @@ async function runAction(socketEvent, apiPath, payload = {}) {
 
 function connectSocket() {
   if (socket) socket.disconnect();
-  if (supabaseClient) {
+  if (supabaseConfig) {
     clearInterval(supabaseStatePoll);
     supabaseStatePoll = setInterval(() => void refreshSupabaseState(), 5000);
+    if (!supabaseClient) {
+      void refreshSupabaseState();
+      return;
+    }
     if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = supabaseClient
       .channel('meeting-vote-state')
@@ -214,7 +222,9 @@ function renderRoleSelect() {
   setRoleBg(true);
   setAdminBg(false);
   setVoterBg(false);
-    const realtimeName = supabaseClient ? 'Supabase Realtime' : 'WebSocket';
+    const realtimeName = supabaseConfig
+      ? (supabaseClient ? 'Supabase Realtime' : 'Supabase API (đồng bộ định kỳ)')
+      : 'WebSocket';
   app.innerHTML = `
     <h1 class="title">Biểu quyết Nghị Quyết</h1>
     <div class="card role-card">
@@ -358,7 +368,7 @@ async function enterDisplay() {
   socket = null;
   setDisplayBg(true);
   renderDisplay();
-  if (supabaseClient) {
+  if (supabaseConfig) {
     connectSocket();
     return;
   }
@@ -408,7 +418,7 @@ function renderAdmin() {
     <div class="admin-grid">
       <div class="card panel">
         <h2>Công văn hiện tại</h2>
-          <div class="desc">Nhập nội dung công văn và bấm "Đưa ra biểu quyết" — mọi người tham dự sẽ thấy ngay lập tức qua ${supabaseClient ? 'Supabase Realtime' : 'WebSocket'}.</div>
+          <div class="desc">Nhập nội dung công văn và bấm "Đưa ra biểu quyết" — mọi người tham dự sẽ thấy ngay lập tức qua ${supabaseConfig ? (supabaseClient ? 'Supabase Realtime' : 'Supabase API') : 'WebSocket'}.</div>
         <label>Tiêu đề công văn</label>
         <input type="text" id="doc-title" placeholder="Ví dụ: Công văn số 12/CV-2026 về..." ${doc && doc.status === 'open' ? 'disabled' : ''} value="${doc && doc.status === 'open' ? escapeHtml(doc.title) : ''}">
         <label>Nội dung tóm tắt (tuỳ chọn)</label>
@@ -535,7 +545,7 @@ function renderAdmin() {
   const startBtn = document.getElementById('start-vote');
   if (startBtn) startBtn.onclick = () => {
     const title = document.getElementById('doc-title').value.trim();
-    if (!title) return;
+    if (!title) return alert('Vui lòng nhập tiêu đề công văn trước khi đưa ra biểu quyết.');
     const content = document.getElementById('doc-content').value.trim();
     void runAction('admin:createDoc', '/api/admin/create-doc', { title, content });
   };
