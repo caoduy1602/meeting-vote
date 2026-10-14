@@ -119,13 +119,9 @@ function connectSocket() {
     if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = supabaseClient
       .channel('meeting-vote-state')
-      .on('broadcast', { event: 'state' }, ({ payload }) => {
-        latestState = payload.state || payload;
-        if (session && session.role === 'voter') {
-          void refreshSupabaseState();
-        } else {
-          rerenderCurrentView();
-        }
+      .on('broadcast', { event: 'state' }, () => {
+        // Broadcast chỉ chứa { changedAt }, luôn fetch state mới từ API
+        void refreshSupabaseState();
       })
       .subscribe(status => {
         if (status === 'SUBSCRIBED') void refreshSupabaseState();
