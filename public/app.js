@@ -80,18 +80,22 @@ async function refreshSupabaseState() {
       const response = await apiFetch('/api/state');
       if (!response.ok) throw new Error('Không tải được trạng thái biểu quyết');
       const state = await response.json();
+      let voterStatus = null;
       if (session && session.role === 'voter') {
         const statusResponse = await apiFetch('/api/voter/status', {
           headers: { Authorization: 'Bearer ' + session.token }
         });
         if (statusResponse.status === 401) return expireSupabaseSession();
         if (!statusResponse.ok) throw new Error('Không tải được trạng thái phiếu biểu quyết');
-        const voterStatus = await statusResponse.json();
-        if (mutationVersion === supabaseMutationVersion) myVoteStatus = voterStatus;
+        voterStatus = await statusResponse.json();
       }
       if (mutationVersion !== supabaseMutationVersion) return;
+      const stateChanged = JSON.stringify(state) !== JSON.stringify(latestState);
+      const voterStatusChanged = voterStatus
+        && JSON.stringify(voterStatus) !== JSON.stringify(myVoteStatus);
       latestState = state;
-      rerenderCurrentView();
+      if (voterStatusChanged) myVoteStatus = voterStatus;
+      if (stateChanged || voterStatusChanged) rerenderCurrentView();
     } catch (error) {
       console.error('Không tải được trạng thái Supabase:', error);
     }
